@@ -1,0 +1,248 @@
+.meet-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.meet-modal__dialog {
+  width: 100%;
+  max-width: 580px;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+  padding: 1.75rem;
+  color: #f8fafc;
+  animation: meetFade 0.25s ease-out;
+}
+
+@keyframes meetFade {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.meet-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.meet-modal__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: #ffffff;
+}
+
+.meet-modal__sub {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin-top: 0.25rem;
+}
+
+.meet-modal__close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+.meet-modal__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.meet-modal__leader-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.meet-modal__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #ffffff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.meet-modal__leader-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.meet-modal__leader-title {
+  font-size: 0.8rem;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.meet-modal__leader-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  margin-top: 0.25rem;
+}
+
+.meet-modal__field {
+  margin-bottom: 1.25rem;
+}
+
+.meet-modal__field label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-bottom: 0.5rem;
+}
+
+.meet-modal__slots-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.meet-modal__slot-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #f1f5f9;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.meet-modal__slot-btn:hover {
+  border-color: #38bdf8;
+  background: #1e293b;
+}
+
+.meet-modal__slot-btn--active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.meet-modal__slot-date {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+.meet-modal__slot-btn--active .meet-modal__slot-date {
+  color: #dbeafe;
+}
+
+.meet-modal__slot-time {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.meet-modal__select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.meet-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.meet-modal__btn {
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.meet-modal__btn--cancel {
+  background: #334155;
+  color: #cbd5e1;
+}
+.meet-modal__btn--cancel:hover { background: #475569; }
+
+.meet-modal__btn--submit {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+}
+.meet-modal__btn--submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669, #047857);
+}
+.meet-modal__btn--submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.meet-modal__success {
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+
+.meet-modal__success-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  font-size: 1.8rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem auto;
+}
+
+.meet-modal__ticket {
+  background: #0f172a;
+  border: 1px dashed #3b82f6;
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.meet-modal__note {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-bottom: 1.25rem;
+}

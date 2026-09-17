@@ -1,0 +1,109 @@
+.notif-toast {
+  position: fixed;
+  top: 84px;
+  right: 24px;
+  z-index: 9999;
+  transform: translateX(120%);
+  transition: transform 0.4s ease;
+  max-width: 400px;
+}
+
+.notif-toast--visible {
+  transform: translateX(0);
+}
+
+.notif-toast__inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #fff;
+}
+
+.notif-toast__inner { background: #1e293b; }
+
+.notif-toast__inner button {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.7;
+  padding: 0;
+  line-height: 1;
+}
+
+.notif-toast__inner button:hover { opacity: 1; }
+
+.notif-bell {
+  position: relative;
+}
+
+.notif-bell__btn {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 4px;
+  position: relative;
+}
+
+.notif-bell__count {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--danger);
+  border-radius: 9px;
+  padding: 0 4px;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 340px;
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.notif-dropdown__header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 0.9rem;
+}
+
+.notif-dropdown__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-dropdown__item {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--gray-50);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.notif-dropdown__item p { color: var(--gray-700); margin-bottom: 4px; }
+
+.notif-dropdown__meta {
+  font-size: 0.75rem;
+  color: var(--gray-400);
+}

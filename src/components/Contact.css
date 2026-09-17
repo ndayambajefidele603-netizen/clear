@@ -1,0 +1,138 @@
+.contact {
+  background: #fff;
+}
+
+.contact__header {
+  transition: all 0.6s ease;
+}
+
+.contact__inner {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 64px;
+  align-items: start;
+}
+
+.contact__info {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.contact__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.contact__item-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.contact__item strong {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--secondary);
+  margin-bottom: 4px;
+}
+
+.contact__item p {
+  font-size: 0.9rem;
+  color: var(--gray-500);
+  line-height: 1.5;
+}
+
+.contact__form {
+  background: var(--gray-50);
+  padding: 36px;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+}
+
+.contact__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.contact__input,
+.contact__textarea {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--gray-800);
+  transition: border-color 0.2s;
+  margin-bottom: 16px;
+}
+
+.contact__input:focus,
+.contact__textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.contact__submit {
+  width: 100%;
+  padding: 14px 28px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  transition: background 0.2s;
+}
+
+.contact__submit:hover {
+  background: var(--primary-dark);
+}
+
+.contact__success {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.contact__success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--success);
+  border-radius: 50%;
+  margin: 0 auto 20px;
+}
+
+.contact__success h3 {
+  font-size: 1.25rem;
+  color: var(--secondary);
+  margin-bottom: 8px;
+}
+
+.contact__success p {
+  color: var(--gray-500);
+}
+
+@media (max-width: 768px) {
+  .contact__inner {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .contact__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .contact__form {
+    padding: 24px;
+  }
+}
