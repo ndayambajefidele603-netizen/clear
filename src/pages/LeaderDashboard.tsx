@@ -4,13 +4,14 @@ import DocPreviewModal from '../components/DocPreviewModal'
 import './LeaderDashboard.css'
 
 export default function LeaderDashboard() {
-  const { user, verifyDoc, approveRequest, rejectRequest, meetingSlots, cancelMeeting, allStudents, getStudentRequests } = useApp()
+  const { user, verifyDoc, approveAllDocs, approveRequest, rejectRequest, meetingSlots, cancelMeeting, allStudents, getStudentRequests, loginLeader } = useApp()
   const [tab, setTab] = useState<'pending' | 'students' | 'meetings' | 'history'>('pending')
-  const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
+  const [requestTypeFilter, setRequestTypeFilter] = useState<'all' | 'clearance' | 'transcript'>('all')
+  const [selectedItemKey, setSelectedItemKey] = useState<string | null>(null)
   const [comment, setComment] = useState('')
-  const [sigModal, setSigModal] = useState<{ studentEmail: string; action: 'approve' | 'reject' } | null>(null)
+  const [sigModal, setSigModal] = useState<{ studentEmail: string; requestId: string; requestType: string; action: 'approve' | 'reject' } | null>(null)
   const [signature, setSignature] = useState('')
-  const [previewDocModal, setPreviewDocModal] = useState<{ doc: RequestDocument; student: StudentRecord } | null>(null)
+  const [previewDocModal, setPreviewDocModal] = useState<{ doc: RequestDocument; student: StudentRecord; requestId: string } | null>(null)
 
   // Database search & filter state
   const [searchTerm, setSearchTerm] = useState('')
@@ -24,44 +25,48 @@ export default function LeaderDashboard() {
   }
 
   const leader = user.profile
-  // Dynamic list of students whose clearance request is currently waiting at this leader's level
-  const pendingStudents = allStudents.filter(student => {
+
+  // Dynamic list of student requests currently waiting at this leader's level
+  const pendingItems = allStudents.flatMap(student => {
     const reqs = getStudentRequests(student.email)
-    const clearanceReq = reqs.find(r => r.type === 'clearance')
-    if (!clearanceReq) return false
-    return clearanceReq.status === 'in_progress' && clearanceReq.currentLevel === leader.level
+    return reqs
+      .filter(r => r.status === 'in_progress' && r.currentLevel === leader.level)
+      .map(req => ({ student, request: req }))
+  }).filter(item => {
+    if (requestTypeFilter === 'all') return true
+    return item.request.type === requestTypeFilter
   })
 
   const mySlots = meetingSlots.filter(s => s.leaderId === leader.id)
   const bookedSlots = mySlots.filter(s => !s.available)
   const availableSlots = mySlots.filter(s => s.available)
 
-  const handleVerify = (studentEmail: string, docId: string, approved: boolean) => {
-    const reqs = getStudentRequests(studentEmail)
-    const clearanceReq = reqs.find(r => r.type === 'clearance') || reqs[0]
-    verifyDoc(studentEmail, clearanceReq?.id || 'CLR-2026', docId, approved, leader.name)
+  const handleVerify = (studentEmail: string, requestId: string, docId: string, approved: boolean) => {
+    verifyDoc(studentEmail, requestId, docId, approved, leader.name)
   }
 
-  const openSignatureModal = (studentEmail: string, action: 'approve' | 'reject') => {
+  const handleApproveAll = (studentEmail: string, requestId: string) => {
+    approveAllDocs(studentEmail, requestId, leader.name)
+  }
+
+  const openSignatureModal = (studentEmail: string, requestId: string, requestType: string, action: 'approve' | 'reject') => {
     setSignature(leader.name)
-    setSigModal({ studentEmail, action })
+    setSigModal({ studentEmail, requestId, requestType, action })
   }
 
   const confirmSignature = () => {
     if (!sigModal || !signature.trim()) return
-    const studentEmail = sigModal.studentEmail
-    const reqs = getStudentRequests(studentEmail)
-    const clearanceReq = reqs.find(r => r.type === 'clearance') || reqs[0]
+    const { studentEmail, requestId, action } = sigModal
 
-    if (sigModal.action === 'approve') {
-      approveRequest(studentEmail, clearanceReq?.id || 'CLR-2026', comment || 'Approved — all requirements met.', leader.name, signature.trim())
+    if (action === 'approve') {
+      approveRequest(studentEmail, requestId, comment || 'Approved — all required documents verified and approved.', leader.name, signature.trim())
     } else {
-      rejectRequest(studentEmail, clearanceReq?.id || 'CLR-2026', comment || 'Requirements not met.', leader.name, signature.trim())
+      rejectRequest(studentEmail, requestId, comment || 'Requirements not met.', leader.name, signature.trim())
     }
     setComment('')
     setSigModal(null)
     setSignature('')
-    setSelectedStudent(null)
+    setSelectedItemKey(null)
   }
 
   const closeSigModal = () => {
@@ -82,9 +87,49 @@ export default function LeaderDashboard() {
   return (
     <section className="ldash">
       <div className="container">
+        {/* Quick Leader Switcher Toolbar */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          flexWrap: 'wrap',
+          background: 'rgba(15, 23, 42, 0.7)',
+          padding: '10px 16px',
+          borderRadius: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          marginBottom: '1rem'
+        }}>
+          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>
+            Switch Active Leader (Approval Chain):
+          </span>
+          {LEADERS.map(l => (
+            <button
+              key={l.id}
+              type="button"
+              onClick={() => loginLeader(l.email)}
+              style={{
+                background: l.id === leader.id ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+                color: l.id === leader.id ? '#ffffff' : '#94a3b8',
+                border: l.id === leader.id ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                padding: '6px 12px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              L{l.level}: {l.title} ({l.avatar})
+            </button>
+          ))}
+        </div>
+
         {/* Leader Profile Header */}
         <div className="ldash__profile">
-          <div className="ldash__profile-avatar">{leader.avatar}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src="/ur-logo.png" alt="University of Rwanda" style={{ width: '52px', height: '52px', objectFit: 'contain' }} />
+            <div className="ldash__profile-avatar">{leader.avatar}</div>
+          </div>
           <div className="ldash__profile-info">
             <h1 className="ldash__title">{leader.title}</h1>
             <p className="ldash__name">{leader.name}</p>
@@ -110,7 +155,7 @@ export default function LeaderDashboard() {
         {/* Stats */}
         <div className="ldash__stats">
           <div className="ldash__stat">
-            <span className="ldash__stat-num">{pendingStudents.length}</span>
+            <span className="ldash__stat-num">{pendingItems.length}</span>
             <span className="ldash__stat-lbl">Pending Reviews</span>
           </div>
           <div className="ldash__stat">
@@ -123,14 +168,14 @@ export default function LeaderDashboard() {
           </div>
           <div className="ldash__stat">
             <span className="ldash__stat-num">{allStudents.length}</span>
-            <span className="ldash__stat-lbl">Total Students (2022-26)</span>
+            <span className="ldash__stat-lbl">Total Students</span>
           </div>
         </div>
 
         {/* Tabs */}
         <div className="ldash__tabs">
           <button className={`ldash__tab ${tab === 'pending' ? 'ldash__tab--active' : ''}`} onClick={() => setTab('pending')}>
-            📋 Pending Reviews ({pendingStudents.length})
+            📋 Pending Reviews ({pendingItems.length})
           </button>
           <button className={`ldash__tab ${tab === 'students' ? 'ldash__tab--active' : ''}`} onClick={() => setTab('students')}>
             👥 Student Database ({allStudents.length})
@@ -146,28 +191,79 @@ export default function LeaderDashboard() {
         {/* Pending Reviews */}
         {tab === 'pending' && (
           <div className="ldash__content">
-            {pendingStudents.length === 0 ? (
+            {/* Sub-filter for Clearance vs Transcript */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Filter Request Type:</span>
+              <button
+                type="button"
+                onClick={() => setRequestTypeFilter('all')}
+                style={{
+                  padding: '4px 12px', borderRadius: '16px', fontSize: '0.8rem', cursor: 'pointer',
+                  background: requestTypeFilter === 'all' ? '#2563eb' : 'rgba(255,255,255,0.06)',
+                  color: '#fff', border: 'none'
+                }}
+              >
+                All Requests ({allStudents.flatMap(s => getStudentRequests(s.email).filter(r => r.status === 'in_progress' && r.currentLevel === leader.level)).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setRequestTypeFilter('clearance')}
+                style={{
+                  padding: '4px 12px', borderRadius: '16px', fontSize: '0.8rem', cursor: 'pointer',
+                  background: requestTypeFilter === 'clearance' ? '#2563eb' : 'rgba(255,255,255,0.06)',
+                  color: '#fff', border: 'none'
+                }}
+              >
+                Clearance ({allStudents.flatMap(s => getStudentRequests(s.email).filter(r => r.type === 'clearance' && r.status === 'in_progress' && r.currentLevel === leader.level)).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setRequestTypeFilter('transcript')}
+                style={{
+                  padding: '4px 12px', borderRadius: '16px', fontSize: '0.8rem', cursor: 'pointer',
+                  background: requestTypeFilter === 'transcript' ? '#2563eb' : 'rgba(255,255,255,0.06)',
+                  color: '#fff', border: 'none'
+                }}
+              >
+                Transcript ({allStudents.flatMap(s => getStudentRequests(s.email).filter(r => r.type === 'transcript' && r.status === 'in_progress' && r.currentLevel === leader.level)).length})
+              </button>
+            </div>
+
+            {pendingItems.length === 0 ? (
               <div className="ldash__empty">
-                <p>✨ No pending reviews. All students at your level have been processed.</p>
+                <p>✨ No pending requests waiting at Level {leader.level}. All student documents at your stage have been processed.</p>
               </div>
             ) : (
               <div className="ldash__student-list">
-                {pendingStudents.map(student => {
-                  const reqs = getStudentRequests(student.email)
-                  const clearanceReq = reqs.find(r => r.type === 'clearance') || reqs[0]
+                {pendingItems.map(({ student, request }) => {
+                  const itemKey = `${student.id}_${request.id}`
+                  const isOpen = selectedItemKey === itemKey
+                  const approvedDocsCount = request.docs.filter(d => d.verified).length
+                  const totalDocsCount = request.docs.length
+                  const allDocsApproved = totalDocsCount > 0 && approvedDocsCount === totalDocsCount
 
                   return (
-                    <div key={student.id} className={`ldash__student-card ${selectedStudent === student.id ? 'ldash__student-card--open' : ''}`}>
-                      <button className="ldash__student-header" onClick={() => setSelectedStudent(selectedStudent === student.id ? null : student.id)}>
+                    <div key={itemKey} className={`ldash__student-card ${isOpen ? 'ldash__student-card--open' : ''}`}>
+                      <button className="ldash__student-header" onClick={() => setSelectedItemKey(isOpen ? null : itemKey)}>
                         <div className="ldash__student-avatar">{student.name.split(' ').map(n => n[0]).join('')}</div>
                         <div className="ldash__student-info">
                           <strong>{student.name}</strong>
                           <p>{student.id} · {student.program} · {student.year}</p>
                         </div>
-                        <span className="ldash__student-badge">Level {leader.level}</span>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{
+                            padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700,
+                            background: request.type === 'clearance' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                            color: request.type === 'clearance' ? '#60a5fa' : '#34d399',
+                            border: `1px solid ${request.type === 'clearance' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`
+                          }}>
+                            {request.type === 'clearance' ? 'Clearance' : 'Transcript'} ({request.id})
+                          </span>
+                          <span className="ldash__student-badge">Level {leader.level}</span>
+                        </div>
                       </button>
 
-                      {selectedStudent === student.id && (
+                      {isOpen && (
                         <div className="ldash__student-body">
                           <div className="ldash__student-details">
                             <p><strong>Email:</strong> {student.email}</p>
@@ -176,32 +272,44 @@ export default function LeaderDashboard() {
                             <p><strong>Enrolled:</strong> {student.enrollmentYear}</p>
                             <p><strong>Status:</strong> {student.status}</p>
                           </div>
+
                           <div className="ldash__student-docs">
-                            <h4>Verify Required Documents</h4>
-                            {clearanceReq.docs.map(doc => (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <h4>Verify Required Documents ({approvedDocsCount}/{totalDocsCount} Approved)</h4>
+                              <button
+                                type="button"
+                                className="ldash__btn ldash__btn--sm ldash__btn--ok"
+                                onClick={() => handleApproveAll(student.email, request.id)}
+                                style={{ fontWeight: 600, fontSize: '0.8rem' }}
+                              >
+                                ✓ Approve All Documents
+                              </button>
+                            </div>
+
+                            {request.docs.map(doc => (
                               <div key={doc.id} className="ldash__doc-row">
                                 <div className="ldash__doc-name-col">
                                   <strong>{doc.name}</strong>
                                   <span className={`ldash__doc-tag ${doc.verified ? 'ldash__doc-tag--ok' : doc.uploaded ? 'ldash__doc-tag--pending' : 'ldash__doc-tag--none'}`}>
-                                    {doc.verified ? '✓ Verified' : doc.uploaded ? 'Uploaded' : 'Missing'}
+                                    {doc.verified ? '✓ Approved' : doc.uploaded ? 'Uploaded' : 'Missing'}
                                   </span>
                                 </div>
                                 <div className="ldash__doc-btn-group">
                                   <button
                                     className="ldash__btn ldash__btn--sm ldash__btn--info"
-                                    onClick={() => setPreviewDocModal({ doc, student })}
+                                    onClick={() => setPreviewDocModal({ doc, student, requestId: request.id })}
                                   >
-                                    👁️ Inspection Preview
+                                    👁️ Preview
                                   </button>
                                   <button
                                     className="ldash__btn ldash__btn--sm ldash__btn--ok"
-                                    onClick={() => handleVerify(student.email, doc.id, true)}
+                                    onClick={() => handleVerify(student.email, request.id, doc.id, true)}
                                   >
                                     ✓ Approve
                                   </button>
                                   <button
                                     className="ldash__btn ldash__btn--sm ldash__btn--danger"
-                                    onClick={() => handleVerify(student.email, doc.id, false)}
+                                    onClick={() => handleVerify(student.email, request.id, doc.id, false)}
                                   >
                                     ✗ Reject
                                   </button>
@@ -209,21 +317,60 @@ export default function LeaderDashboard() {
                               </div>
                             ))}
                           </div>
+
                           <div className="ldash__student-action">
-                            <h4>Final Decision & Forward</h4>
+                            <h4>Final Decision & Level Sign-off</h4>
+
+                            {!allDocsApproved && (
+                              <div style={{
+                                background: 'rgba(239, 68, 68, 0.12)',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                borderRadius: '8px',
+                                padding: '10px 14px',
+                                color: '#fca5a5',
+                                fontSize: '0.85rem',
+                                marginBottom: '10px'
+                              }}>
+                                ⚠️ <strong>Document Verification Enforced:</strong> Every document must be approved by {leader.name} before this request can be signed and forwarded to {leader.level === 4 ? 'issue the final certificate' : `Level ${leader.level + 1}`}.
+                              </div>
+                            )}
+
+                            {allDocsApproved && (
+                              <div style={{
+                                background: 'rgba(16, 185, 129, 0.12)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                borderRadius: '8px',
+                                padding: '10px 14px',
+                                color: '#6ee7b7',
+                                fontSize: '0.85rem',
+                                marginBottom: '10px'
+                              }}>
+                                ✓ <strong>All documents verified:</strong> You may now sign off and forward this request.
+                              </div>
+                            )}
+
                             <textarea
                               className="ldash__comment"
-                              placeholder="Add review comment or notes for next leader level..."
+                              placeholder={`Add review comments or notes for ${leader.level === 4 ? 'final official record' : 'next leader level'}...`}
                               value={comment}
                               onChange={e => setComment(e.target.value)}
                               rows={2}
                             />
                             <div className="ldash__action-row">
-                              <button className="ldash__btn ldash__btn--approve" onClick={() => openSignatureModal(student.email, 'approve')}>
-                                ✓ Approve & Forward →
+                              <button
+                                className="ldash__btn ldash__btn--approve"
+                                onClick={() => openSignatureModal(student.email, request.id, request.type, 'approve')}
+                                disabled={!allDocsApproved}
+                                style={{ opacity: allDocsApproved ? 1 : 0.5, cursor: allDocsApproved ? 'pointer' : 'not-allowed' }}
+                                title={!allDocsApproved ? 'Approve all required documents first' : 'Sign and forward'}
+                              >
+                                {leader.level === 4 ? '✓ Final Approval & Issue Certificate →' : '✓ Approve & Forward →'}
                               </button>
-                              <button className="ldash__btn ldash__btn--reject" onClick={() => openSignatureModal(student.email, 'reject')}>
-                                ✗ Reject Clearance
+                              <button
+                                className="ldash__btn ldash__btn--reject"
+                                onClick={() => openSignatureModal(student.email, request.id, request.type, 'reject')}
+                              >
+                                ✗ Reject Request
                               </button>
                             </div>
                           </div>
@@ -411,7 +558,7 @@ export default function LeaderDashboard() {
           studentId={previewDocModal.student.id}
           isLeader={true}
           onClose={() => setPreviewDocModal(null)}
-          onVerify={(approved) => handleVerify(previewDocModal.student.email, previewDocModal.doc.id, approved)}
+          onVerify={(approved) => handleVerify(previewDocModal.student.email, previewDocModal.requestId, previewDocModal.doc.id, approved)}
         />
       )}
     </section>

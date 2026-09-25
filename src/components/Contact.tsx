@@ -35,21 +35,21 @@ export default function Contact() {
               <span className="contact__item-icon">📧</span>
               <div>
                 <strong>Email</strong>
-                <p>hello@clearky.edu</p>
+                <p>support@clear&trans.ur.ac.rw</p>
               </div>
             </div>
             <div className="contact__item">
               <span className="contact__item-icon">📞</span>
               <div>
                 <strong>Phone</strong>
-                <p>+1 (555) 000-0000</p>
+                <p>+250 788 555 000</p>
               </div>
             </div>
             <div className="contact__item">
               <span className="contact__item-icon">📍</span>
               <div>
                 <strong>Address</strong>
-                <p>123 Education St, Suite 400<br />San Francisco, CA 94105</p>
+                <p>University of Rwanda<br />Kigali, Rwanda</p>
               </div>
             </div>
           </div>

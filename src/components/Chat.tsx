@@ -45,7 +45,7 @@ function getAIResponse(input: string, request?: StudentRequest): string {
     return `❌ **Handling Rejections:**\nIf a leader rejects your clearance or a document:\n1. Check the comment left in your **Approval Pipeline** tab.\n2. Re-upload corrected documents under the **Documents** tab.\n3. Book an office meeting or contact the leader during office hours.`
   }
 
-  return `🤖 I am the **CLEARKY AI Assistant**. I can help you with:\n• Tracking your ${type} request progress\n• Understanding required document uploads\n• Finding leader office hours & booking appointments\n• Payment & fee guidelines\n\nHow can I help you today?`
+  return `🤖 I am the **CLEAR&TRANS AI Assistant**. I can help you with:\n• Tracking your ${type} request progress\n• Understanding required document uploads\n• Finding leader office hours & booking appointments\n• Payment & fee guidelines\n\nHow can I help you today?`
 }
 
 export default function Chat({ request, compact, leaderName, leaderTitle }: {
@@ -55,7 +55,7 @@ export default function Chat({ request, compact, leaderName, leaderTitle }: {
   leaderTitle?: string
 }) {
   const [messages, setMessages] = useState<Array<{ text: string; from: 'user' | 'ai' }>>([
-    { text: `Hello! I'm your CLEARKY AI Assistant. I can help you track your ${request?.type || 'clearance'} request, find leader office hours, and check document requirements.`, from: 'ai' },
+    { text: `Hello! I'm your CLEAR&TRANS AI Assistant. I can help you track your ${request?.type || 'clearance'} request, find leader office hours, and check document requirements.`, from: 'ai' },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -96,7 +96,7 @@ export default function Chat({ request, compact, leaderName, leaderTitle }: {
           <div className="chat__header-info">
             <div className="chat__avatar chat__avatar--ai">AI</div>
             <div>
-              <h3 className="chat__leader-name">CLEARKY Assistant</h3>
+              <h3 className="chat__leader-name">CLEAR&TRANS Assistant</h3>
               <p className="chat__leader-title">University of Rwanda Support · Request {request?.id}</p>
             </div>
           </div>

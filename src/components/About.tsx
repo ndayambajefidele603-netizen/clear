@@ -19,7 +19,7 @@ export default function About() {
               <span className="about__highlight">Educational Institutions</span>
             </h2>
             <p className="about__text">
-              CLEARKY is a comprehensive digital platform designed to eliminate the
+              CLEAR&TRANS is a comprehensive digital platform designed to eliminate the
               bureaucratic bottlenecks in student clearance and transcript processing.
               Our system connects departments, administrators, and students in a
               seamless digital workflow.

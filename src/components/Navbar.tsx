@@ -46,7 +46,7 @@ export default function Navbar() {
         <Link to="/" className="navbar__logo">
           <img src="/ur-logo.png" alt="UR" className="navbar__logo-img" />
           <span className="navbar__logo-text">
-            <span className="navbar__logo-brand">CLEAR&amp;TRANS</span>
+            <span className="navbar__logo-brand">CLEAR&TRANS</span>
             <span className="navbar__logo-sub">Univ. of Rwanda</span>
           </span>
         </Link>

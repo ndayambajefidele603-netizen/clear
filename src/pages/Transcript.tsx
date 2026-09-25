@@ -64,7 +64,7 @@ export default function Transcript() {
                 onClick={() => setShowCert(true)}
                 style={{ background: '#10b981', color: '#fff', padding: '6px 14px', borderRadius: '20px', fontWeight: '700', fontSize: '0.85rem' }}
               >
-                📜 View Transcript Certificate
+                📊 View Official Transcript & Certificate
               </button>
             )}
           </div>

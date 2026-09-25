@@ -12,6 +12,20 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.footer__brand-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer__logo-mark {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 4px 10px rgba(59, 130, 246, 0.25));
+}
+
 .footer__logo {
   font-size: 1.25rem;
   font-weight: 800;

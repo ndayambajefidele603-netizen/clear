@@ -6,7 +6,10 @@ export default function Footer() {
       <div className="container">
         <div className="footer__grid">
           <div className="footer__brand">
-            <span className="footer__logo">◆ CLEARKY</span>
+            <div className="footer__brand-inner">
+              <img src="/ur-logo.png" alt="University of Rwanda" className="footer__logo-mark" />
+              <span className="footer__logo">CLEAR&TRANS</span>
+            </div>
             <p className="footer__desc">
               The modern digital clearance and transcript management system for
               educational institutions worldwide.
@@ -32,7 +35,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="footer__bottom">
-          <p>&copy; {new Date().getFullYear()} CLEARKY. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} CLEAR&TRANS. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -11,6 +11,13 @@ export default function Hero() {
       </div>
       <div className="container hero__inner">
         <div className="hero__content">
+          <div className="hero__brand anim-fade-in-down delay-1">
+            <img src="/ur-logo.png" alt="University of Rwanda" className="hero__brand-logo" />
+            <div className="hero__brand-copy">
+              <span>University of Rwanda</span>
+              <small>Academic Excellence</small>
+            </div>
+          </div>
           <span className="hero__badge anim-fade-in-down delay-1">🚀 School Management Solution</span>
           <h1 className="hero__title anim-fade-in-up delay-2">
             Digital Clearance &<br />
@@ -30,16 +37,16 @@ export default function Hero() {
           </div>
           <div className="hero__stats anim-fade-in-up delay-5">
             <div className="hero__stat">
-              <span className="hero__stat-number">500+</span>
-              <span className="hero__stat-label">Schools</span>
+              <span className="hero__stat-number">7</span>
+              <span className="hero__stat-label">Colleges</span>
             </div>
             <div className="hero__stat">
-              <span className="hero__stat-number">50K+</span>
+              <span className="hero__stat-number">520+</span>
               <span className="hero__stat-label">Students</span>
             </div>
             <div className="hero__stat">
-              <span className="hero__stat-number">99.9%</span>
-              <span className="hero__stat-label">Uptime</span>
+              <span className="hero__stat-number">4</span>
+              <span className="hero__stat-label">Approval Levels</span>
             </div>
           </div>
         </div>

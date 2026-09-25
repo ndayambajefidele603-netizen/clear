@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useApp, UR_HIERARCHY, type RequestDocument } from '../context/AppContext'
+import { useApp, UR_HIERARCHY, type RequestDocument, type StudentRequest } from '../context/AppContext'
 import CertificateModal from '../components/CertificateModal'
 import MeetingModal from '../components/MeetingModal'
 import DocPreviewModal from '../components/DocPreviewModal'
@@ -8,7 +8,7 @@ import './Dashboard.css'
 
 export default function Dashboard() {
   const { user, requests } = useApp()
-  const [showCert, setShowCert] = useState(false)
+  const [selectedCertRequest, setSelectedCertRequest] = useState<StudentRequest | null>(null)
   const [showMeeting, setShowMeeting] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<RequestDocument | null>(null)
 
@@ -39,16 +39,50 @@ export default function Dashboard() {
             {clearance?.status === 'completed' && (
               <button
                 className="dash__btn-cert"
-                onClick={() => setShowCert(true)}
+                onClick={() => setSelectedCertRequest(clearance)}
                 style={{
                   padding: '6px 14px', borderRadius: '20px', background: 'linear-gradient(135deg, #10b981, #059669)',
                   color: '#fff', border: 'none', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer',
                   boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
                 }}
               >
-                📜 Certificate Ready
+                📜 Clearance Certificate
               </button>
             )}
+            {transcript?.status === 'completed' && (
+              <button
+                className="dash__btn-cert"
+                onClick={() => setSelectedCertRequest(transcript)}
+                style={{
+                  padding: '6px 14px', borderRadius: '20px', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  color: '#fff', border: 'none', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+                }}
+              >
+                📊 Official Transcript Ready
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="dash__overview">
+          <div className="dash__overview-card">
+            <div className="dash__overview-header">
+              <span>Completion status</span>
+              <strong>{Math.round(((clearance?.steps.filter(s => s.status === 'approved').length || 0) / Math.max(clearance?.steps.length || 1, 1)) * 100)}%</strong>
+            </div>
+            <div className="dash__progress-track">
+              <span className="dash__progress-fill" style={{ width: `${Math.round(((clearance?.steps.filter(s => s.status === 'approved').length || 0) / Math.max(clearance?.steps.length || 1, 1)) * 100)}%` }} />
+            </div>
+          </div>
+          <div className="dash__overview-card">
+            <div className="dash__overview-header">
+              <span>Document verification</span>
+              <strong>{Math.round(((verifiedDocs || 0) / Math.max(totalDocs || 1, 1)) * 100)}%</strong>
+            </div>
+            <div className="dash__progress-track dash__progress-track--green">
+              <span className="dash__progress-fill dash__progress-fill--green" style={{ width: `${Math.round(((verifiedDocs || 0) / Math.max(totalDocs || 1, 1)) * 100)}%` }} />
+            </div>
           </div>
         </div>
 
@@ -133,11 +167,11 @@ export default function Dashboard() {
                   </Link>
                   {req.status === 'completed' && (
                     <button
-                      onClick={() => setShowCert(true)}
+                      onClick={() => setSelectedCertRequest(req)}
                       className="dash__request-btn"
-                      style={{ background: '#10b981', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                      style={{ background: req.type === 'clearance' ? '#10b981' : '#2563eb', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
                     >
-                      📜 View Certificate
+                      {req.type === 'clearance' ? '📜 View Certificate' : '📊 View Transcript'}
                     </button>
                   )}
                 </div>
@@ -196,10 +230,12 @@ export default function Dashboard() {
               <span className="dash__action-icon">📅</span>
               Book Leader Meeting
             </button>
-            <button className="dash__action" onClick={() => setShowCert(true)} style={{ border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-              <span className="dash__action-icon">📜</span>
-              View Certificate {clearance?.status === 'completed' ? '✓' : '(Preview)'}
-            </button>
+            {(clearance?.status === 'completed' || transcript?.status === 'completed') && (
+              <button className="dash__action" onClick={() => setSelectedCertRequest(clearance?.status === 'completed' ? clearance : transcript || null)} style={{ border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
+                <span className="dash__action-icon">📜</span>
+                View Official Documents ✓
+              </button>
+            )}
             <Link to="/clearance?chat=1" className="dash__action">
               <span className="dash__action-icon">💬</span>
               AI Assistant
@@ -209,8 +245,8 @@ export default function Dashboard() {
       </div>
 
       {/* Certificate Modal */}
-      {showCert && clearance && (
-        <CertificateModal request={clearance} student={profile} onClose={() => setShowCert(false)} />
+      {selectedCertRequest && (
+        <CertificateModal request={selectedCertRequest} student={profile} onClose={() => setSelectedCertRequest(null)} />
       )}
 
       {/* Meeting Modal */}

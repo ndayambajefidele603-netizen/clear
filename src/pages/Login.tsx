@@ -42,8 +42,8 @@ export default function Login() {
       <div className="login__card">
         <div className="login__header">
           <img src="/ur-logo.png" alt="UR" className="login__logo" />
-          <h2>Welcome to CLEARKY</h2>
-          <p>University of Rwanda — Digital Clearance System</p>
+          <h2>Welcome to CLEAR&TRANS</h2>
+          <p>University of Rwanda — Digital Clearance & Transcript System</p>
         </div>
 
         <div className="login__tabs">
@@ -75,19 +75,47 @@ export default function Login() {
 
           {role === 'leader' && (
             <div className="login__info">
-              <strong>Available leaders:</strong>
-              <ul>
+              <strong>Click any leader to autofill credentials:</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
                 {LEADERS.map(l => (
-                  <li key={l.id}>{l.name} — <em>{l.email}</em> ({l.title})</li>
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => { setEmail(l.email); setPassword('leader123') }}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '6px',
+                      padding: '6px 10px',
+                      color: '#e2e8f0',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <span><strong>L{l.level}: {l.title}</strong> — {l.name}</span>
+                    <span style={{ color: '#38bdf8' }}>Autofill ➔</span>
+                  </button>
                 ))}
-              </ul>
+              </div>
+              <p style={{ marginTop: '8px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                Default staff password format: <strong>leader123</strong> or your official UR access password.
+              </p>
             </div>
           )}
 
           {role === 'student' && (
             <div className="login__info">
-              <p>Use any <strong>@ur.ac.rw</strong> email from the UR database (2022-2026).<br />
-              Example: <em>jean.ndayambaje@ur.ac.rw</em></p>
+              <p>Sign in using your personal <strong>student email and password</strong>.</p>
+              <p style={{ marginTop: '4px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                For demo/student records, the default credential format is <strong>UR@123456</strong> based on your student ID.
+              </p>
+              <p style={{ marginTop: '4px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                New student? Click <Link to="/signup" style={{ color: '#38bdf8' }}>Create Account</Link> to register in seconds.
+              </p>
             </div>
           )}
 
