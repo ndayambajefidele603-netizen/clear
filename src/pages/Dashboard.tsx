@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useApp, UR_HIERARCHY, type RequestDocument, type StudentRequest } from '../context/AppContext'
 import CertificateModal from '../components/CertificateModal'
 import MeetingModal from '../components/MeetingModal'
@@ -7,10 +7,13 @@ import DocPreviewModal from '../components/DocPreviewModal'
 import './Dashboard.css'
 
 export default function Dashboard() {
-  const { user, requests } = useApp()
+  const { user, requests, createRequest, getDocumentPreviewUrl } = useApp()
+  const navigate = useNavigate()
   const [selectedCertRequest, setSelectedCertRequest] = useState<StudentRequest | null>(null)
   const [showMeeting, setShowMeeting] = useState(false)
-  const [previewDoc, setPreviewDoc] = useState<RequestDocument | null>(null)
+  const [creatingRequest, setCreatingRequest] = useState<'clearance' | 'transcript' | null>(null)
+  const [requestError, setRequestError] = useState('')
+  const [previewDoc, setPreviewDoc] = useState<(RequestDocument & { requestId: string; requestType: 'clearance' | 'transcript' }) | null>(null)
 
   if (!user || user.role !== 'student') return null
 
@@ -19,11 +22,36 @@ export default function Dashboard() {
   const clearance = studentRequests.find(r => r.type === 'clearance')
   const transcript = studentRequests.find(r => r.type === 'transcript')
 
-  const activeRequests = [clearance, transcript].filter(Boolean)
-  const totalApproved = clearance?.steps.filter(s => s.status === 'approved').length || 0
-  const totalSteps = clearance?.steps.length || 4
-  const verifiedDocs = clearance?.docs.filter(d => d.verified).length || 0
-  const totalDocs = clearance?.docs.length || 0
+  const activeRequests = [clearance, transcript].filter((request): request is StudentRequest => Boolean(request))
+  const requestsInProgress = activeRequests.filter(request => request.status === 'in_progress').length
+  const completedRequests = activeRequests.filter(request => request.status === 'completed').length
+  const documentsToUpload = activeRequests.reduce(
+    (count, request) => count + request.docs.filter(doc => !doc.uploaded).length,
+    0,
+  )
+  const requestDocuments = activeRequests.flatMap(request =>
+    request.docs.map(doc => ({ ...doc, requestId: request.id, requestType: request.type })),
+  )
+  const recentUpdates = activeRequests
+    .flatMap(request => request.updates.map(update => ({ ...update, requestType: request.type })))
+    .slice(-5)
+    .reverse()
+
+  const handleCreateRequest = async (type: 'clearance' | 'transcript') => {
+    setRequestError('')
+    setCreatingRequest(type)
+    try {
+      const created = await createRequest(type)
+      if (!created) return
+      navigate(type === 'clearance' ? '/clearance' : '/transcript')
+    } catch (error) {
+      console.error('Could not start student service request', error)
+      setRequestError(error instanceof Error ? error.message : 'Could not start the request. Please try again.')
+    } finally {
+      setCreatingRequest(null)
+    }
+  }
+
   const currentLeader = clearance ? UR_HIERARCHY.find(l => l.level === clearance.currentLevel) || UR_HIERARCHY[0] : UR_HIERARCHY[0]
 
   return (
@@ -31,8 +59,9 @@ export default function Dashboard() {
       <div className="container">
         <div className="dash__header">
           <div>
-            <h1 className="dash__title">Student Dashboard</h1>
-            <p className="dash__subtitle">{profile.name} — {profile.college}</p>
+            <span className="dash__eyebrow">STUDENT SERVICES PORTAL</span>
+            <h1 className="dash__title">Welcome back, {profile.name.split(' ')[0]}</h1>
+            <p className="dash__subtitle">{profile.program} · {profile.college} · {profile.year}</p>
           </div>
           <div className="dash__student-info" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span className="dash__badge">{profile.id}</span>
@@ -46,7 +75,7 @@ export default function Dashboard() {
                   boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
                 }}
               >
-                📜 Clearance Certificate
+                Clearance request summary
               </button>
             )}
             {transcript?.status === 'completed' && (
@@ -59,106 +88,106 @@ export default function Dashboard() {
                   boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
                 }}
               >
-                📊 Official Transcript Ready
+                Transcript request summary
               </button>
             )}
           </div>
         </div>
 
-        <div className="dash__overview">
-          <div className="dash__overview-card">
-            <div className="dash__overview-header">
-              <span>Completion status</span>
-              <strong>{Math.round(((clearance?.steps.filter(s => s.status === 'approved').length || 0) / Math.max(clearance?.steps.length || 1, 1)) * 100)}%</strong>
-            </div>
-            <div className="dash__progress-track">
-              <span className="dash__progress-fill" style={{ width: `${Math.round(((clearance?.steps.filter(s => s.status === 'approved').length || 0) / Math.max(clearance?.steps.length || 1, 1)) * 100)}%` }} />
-            </div>
+        <div className="dash__stats" aria-label="Request summary">
+          <div className="dash__stat">
+            <div className="dash__stat-value" style={{ color: '#1d4ed8' }}>{activeRequests.length}</div>
+            <div className="dash__stat-label">Services requested</div>
           </div>
-          <div className="dash__overview-card">
-            <div className="dash__overview-header">
-              <span>Document verification</span>
-              <strong>{Math.round(((verifiedDocs || 0) / Math.max(totalDocs || 1, 1)) * 100)}%</strong>
-            </div>
-            <div className="dash__progress-track dash__progress-track--green">
-              <span className="dash__progress-fill dash__progress-fill--green" style={{ width: `${Math.round(((verifiedDocs || 0) / Math.max(totalDocs || 1, 1)) * 100)}%` }} />
-            </div>
+          <div className="dash__stat">
+            <div className="dash__stat-value" style={{ color: '#b45309' }}>{requestsInProgress}</div>
+            <div className="dash__stat-label">Under review</div>
+          </div>
+          <div className="dash__stat">
+            <div className="dash__stat-value" style={{ color: '#047857' }}>{completedRequests}</div>
+            <div className="dash__stat-label">Completed</div>
+          </div>
+          <div className="dash__stat">
+            <div className="dash__stat-value" style={{ color: '#b91c1c' }}>{documentsToUpload}</div>
+            <div className="dash__stat-label">Documents to upload</div>
           </div>
         </div>
 
-        <div className="dash__stats">
-          <div className="dash__stat">
-            <div className="dash__stat-value" style={{ color: '#3b82f6' }}>{totalApproved}/{totalSteps}</div>
-            <div className="dash__stat-label">Clearance Levels Approved</div>
-          </div>
-          <div className="dash__stat">
-            <div className="dash__stat-value" style={{ color: '#10b981' }}>
-              {clearance ? UR_HIERARCHY[clearance.currentLevel - 1]?.title.split(' ').slice(0, 2).join(' ') : '—'}
+        <section className="dash__services" aria-labelledby="dash-services-title">
+          <div className="dash__section-heading">
+            <div>
+              <span className="dash__eyebrow">STUDENT SERVICES</span>
+              <h2 id="dash-services-title">What would you like to do?</h2>
             </div>
-            <div className="dash__stat-label">Current Clearance Level</div>
+            <p>Choose a service to start a request or continue tracking one.</p>
           </div>
-          <div className="dash__stat">
-            <div className="dash__stat-value" style={{ color: '#f59e0b' }}>{verifiedDocs}/{totalDocs}</div>
-            <div className="dash__stat-label">Documents Verified</div>
+          {requestError && <p className="dash__request-error" role="alert">{requestError}</p>}
+          <div className="dash__service-grid">
+            {([
+              { type: 'clearance' as const, request: clearance, title: 'Academic clearance', description: 'Submit your clearance documents and follow the review process.', icon: '✓' },
+              { type: 'transcript' as const, request: transcript, title: 'Academic transcript', description: 'Request your academic transcript and check its progress.', icon: '▤' },
+            ]).map(service => (
+              <article key={service.type} className={`dash__service-card dash__service-card--${service.type}`}>
+                <span className="dash__service-icon" aria-hidden="true">{service.icon}</span>
+                <div className="dash__service-copy">
+                  <h3>{service.title}</h3>
+                  <p>{service.description}</p>
+                </div>
+                {service.request ? (
+                  <Link className="dash__service-link" to={service.type === 'clearance' ? '/clearance' : '/transcript'}>
+                    Track request <span aria-hidden="true">→</span>
+                  </Link>
+                ) : (
+                  <button className="dash__service-link" onClick={() => void handleCreateRequest(service.type)} disabled={creatingRequest !== null}>
+                    {creatingRequest === service.type ? 'Preparing checklist…' : 'Start process'} <span aria-hidden="true">→</span>
+                  </button>
+                )}
+              </article>
+            ))}
           </div>
-          <div className="dash__stat">
-            <div className="dash__stat-value" style={{ color: '#ef4444' }}>
-              {clearance?.updates.length || 0}
-            </div>
-            <div className="dash__stat-label">Status Updates</div>
+        </section>
+
+        <section className="dash__issued-documents" aria-label="Issued documents">
+          <div>
+            <span className="dash__eyebrow">YOUR DOCUMENT LIBRARY</span>
+            <h2>Final documents, all in one place</h2>
+            <p>View and download clearance documents and transcripts released for your requests.</p>
           </div>
-        </div>
+          <Link to="/documents" className="dash__issued-link">Open document library <span aria-hidden="true">→</span></Link>
+        </section>
 
         <div className="dash__grid">
           <div className="dash__card">
             <div className="dash__card-header">
-              <h3>Clearance — Approval Pipeline</h3>
-              <Link to="/clearance" className="dash__card-link">Full Details →</Link>
+              <div>
+                <span className="dash__eyebrow">YOUR ACTIVITY</span>
+                <h2>Your requests</h2>
+              </div>
             </div>
-            <div className="dash__pipeline">
-              {UR_HIERARCHY.map((leader, i) => {
-                const step = clearance?.steps.find(s => s.level === leader.level)
-                const isActive = clearance?.currentLevel === leader.level
-                const isDone = step?.status === 'approved'
-                return (
-                  <div key={leader.id} className={`dash__pipeline-step ${isDone ? 'dash__pipeline-step--done' : ''} ${isActive ? 'dash__pipeline-step--active' : ''}`}>
-                    <div className="dash__pipeline-connector" />
-                    <div className="dash__pipeline-node">
-                      {isDone ? '✓' : isActive ? '●' : String(i + 1)}
-                    </div>
-                    <div className="dash__pipeline-info">
-                      <strong>{leader.title}</strong>
-                      <span>{leader.name}</span>
-                      {isActive && <span className="dash__pipeline-tag">Current Reviewer</span>}
-                      {step?.status === 'approved' && <span className="dash__pipeline-tag dash__pipeline-tag--ok">Approved</span>}
-                      {step?.status === 'rejected' && <span className="dash__pipeline-tag" style={{ background: '#fee2e2', color: '#dc2626' }}>Rejected</span>}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="dash__card">
-            <div className="dash__card-header">
-              <h3>Active Requests</h3>
-            </div>
-            {activeRequests.map(req => req && (
+            {activeRequests.length ? activeRequests.map(req => (
               <div key={req.id} className="dash__request-card">
                 <div className="dash__request-top">
                   <span className={`dash__request-badge dash__request-badge--${req.type}`}>
-                    {req.type === 'clearance' ? 'Clearance' : 'Transcript'}
+                    {req.type === 'clearance' ? 'Academic clearance' : 'Academic transcript'}
                   </span>
                   <span className={`dash__request-status-badge ${req.status === 'in_progress' ? 'dash__request-status-badge--progress' : ''} ${req.status === 'completed' ? 'dash__request-status-badge--done' : ''} ${req.status === 'rejected' ? 'dash__request-status-badge--rejected' : ''}`}>
-                    {req.status === 'in_progress' ? 'In Progress' : req.status === 'completed' ? 'Completed 🎉' : 'Rejected'}
+                    {req.status === 'in_progress' ? 'In review' : req.status === 'completed' ? 'Completed' : req.status === 'rejected' ? 'Needs attention' : 'Documents needed'}
                   </span>
                 </div>
                 <p className="dash__request-id">{req.id}</p>
                 <div className="dash__request-progress">
-                  <div className="dash__request-progress-bar" style={{ width: `${(req.steps.filter(s => s.status === 'approved').length / req.steps.length) * 100}%` }} />
+                  <div
+                    className="dash__request-progress-bar"
+                    role="progressbar"
+                    aria-label={`${req.type} approval progress`}
+                    aria-valuemin={0}
+                    aria-valuemax={req.steps.length}
+                    aria-valuenow={req.steps.filter(s => s.status === 'approved').length}
+                    style={{ width: `${req.steps.length ? (req.steps.filter(s => s.status === 'approved').length / req.steps.length) * 100 : 0}%` }}
+                  />
                 </div>
                 <div className="dash__request-bottom">
-                  <span>{req.steps.filter(s => s.status === 'approved').length}/{req.steps.length} approvals</span>
+                  <span>{req.steps.filter(s => s.status === 'approved').length} of {req.steps.length} review stages approved</span>
                   <span>{req.createdAt}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
@@ -176,69 +205,99 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="dash__empty-state">
+                <span className="dash__empty-icon" aria-hidden="true">▤</span>
+                <h3>No requests yet</h3>
+                <p>Choose one of the services above to start. Its status and next steps will appear here.</p>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="dash__section">
-          <h3>Required Documents</h3>
-          <div className="dash__docs-grid">
-            {clearance?.docs.map(doc => (
-              <div
-                key={doc.id}
+          <div className="dash__section-heading">
+            <div>
+              <span className="dash__eyebrow">DOCUMENT CHECKLIST</span>
+              <h2>Documents</h2>
+            </div>
+            <p>Requirements are shown for requests you have started.</p>
+          </div>
+          {requestDocuments.length ? (
+            <div className="dash__docs-grid">
+            {requestDocuments.map(doc => (
+              <button
+                type="button"
+                key={`${doc.requestId}:${doc.id}`}
                 className={`dash__doc-card ${doc.verified ? 'dash__doc-card--ok' : ''} ${doc.uploaded && !doc.verified ? 'dash__doc-card--uploaded' : ''}`}
+                disabled={!doc.uploaded}
                 onClick={() => setPreviewDoc(doc)}
-                style={{ cursor: 'pointer' }}
-                title="Click to preview document"
+                aria-label={`${doc.uploaded ? 'Open' : 'No file selected for'} ${doc.name}, ${doc.requestType} requirement`}
               >
                 <div className="dash__doc-icon">{doc.verified ? '✓' : doc.uploaded ? '⏳' : '📄'}</div>
                 <div className="dash__doc-info">
                   <strong>{doc.name}</strong>
-                  <p>{doc.desc}</p>
+                  <p>{doc.requestType === 'clearance' ? 'Clearance' : 'Transcript'} · {doc.desc}</p>
                 </div>
                 <span className={`dash__doc-status ${doc.verified ? 'dash__doc-status--ok' : doc.uploaded ? 'dash__doc-status--pending' : 'dash__doc-status--missing'}`}>
-                  {doc.verified ? 'Verified' : doc.uploaded ? 'Pending Review' : 'Not Uploaded'}
+                  {doc.verified ? 'Reviewed' : doc.reviewStatus === 'correction_requested' ? 'Correction requested' : doc.uploaded ? 'Uploaded to portal' : 'Not selected'}
                 </span>
-              </div>
+              </button>
             ))}
-          </div>
+            </div>
+          ) : (
+            <p className="dash__empty-inline">Start a service request to see its document checklist here.</p>
+          )}
         </div>
 
         <div className="dash__section">
-          <h3>Recent Updates</h3>
-          <div className="dash__updates">
-            {clearance?.updates.slice(-5).reverse().map(u => (
+          <div className="dash__section-heading">
+            <div>
+              <span className="dash__eyebrow">REQUEST HISTORY</span>
+              <h2>Recent updates</h2>
+            </div>
+          </div>
+          {recentUpdates.length ? (
+            <div className="dash__updates">
+            {recentUpdates.map(u => (
               <div key={u.id} className="dash__update">
                 <span className={`dash__update-icon ${u.action === 'Approved' || u.action === 'Completed' || u.action === 'Final Approval' ? 'dash__update-icon--ok' : u.action === 'Rejected' ? 'dash__update-icon--warn' : ''}`}>
                   {u.action === 'Approved' || u.action === 'Completed' || u.action === 'Final Approval' ? '✓' : u.action === 'Rejected' ? '!' : '●'}
                 </span>
-                <p>{u.details}</p>
+                <p><strong>{u.requestType === 'clearance' ? 'Clearance' : 'Transcript'}:</strong> {u.details}</p>
                 <span className="dash__update-time">{u.timestamp}</span>
               </div>
             ))}
-          </div>
+            </div>
+          ) : (
+            <p className="dash__empty-inline">Updates will appear here when a request is submitted or reviewed.</p>
+          )}
         </div>
 
         <div className="dash__quick-actions">
           <h3>Quick Actions</h3>
           <div className="dash__actions-grid">
-            <Link to="/clearance" className="dash__action">
-              <span className="dash__action-icon">✓</span>
-              Track Clearance
-            </Link>
+            {clearance && <Link to="/clearance" className="dash__action">
+              <span className="dash__action-icon" aria-hidden="true">✓</span>
+              Track clearance
+            </Link>}
+            {transcript && <Link to="/transcript" className="dash__action">
+              <span className="dash__action-icon" aria-hidden="true">▤</span>
+              Track transcript
+            </Link>}
             <button className="dash__action" onClick={() => setShowMeeting(true)} style={{ border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-              <span className="dash__action-icon">📅</span>
-              Book Leader Meeting
+              <span className="dash__action-icon" aria-hidden="true">▦</span>
+              Book a meeting
             </button>
             {(clearance?.status === 'completed' || transcript?.status === 'completed') && (
               <button className="dash__action" onClick={() => setSelectedCertRequest(clearance?.status === 'completed' ? clearance : transcript || null)} style={{ border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-                <span className="dash__action-icon">📜</span>
-                View Official Documents ✓
+                <span className="dash__action-icon" aria-hidden="true">▣</span>
+                View completed document
               </button>
             )}
             <Link to="/clearance?chat=1" className="dash__action">
-              <span className="dash__action-icon">💬</span>
-              AI Assistant
+              <span className="dash__action-icon" aria-hidden="true">✉</span>
+              Ask the assistant
             </Link>
           </div>
         </div>
@@ -260,6 +319,7 @@ export default function Dashboard() {
           doc={previewDoc}
           studentName={profile.name}
           studentId={profile.id}
+          loadFile={() => getDocumentPreviewUrl(profile.email, previewDoc.requestId, previewDoc.id)}
           onClose={() => setPreviewDoc(null)}
         />
       )}

@@ -128,3 +128,31 @@
 .reveal--visible.reveal--right {
   transform: translateX(0);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-in,
+  .anim-fade-in-up,
+  .anim-fade-in-down,
+  .anim-fade-in-left,
+  .anim-fade-in-right,
+  .anim-scale-in,
+  .anim-float,
+  .anim-pulse {
+    animation: none !important;
+  }
+
+  .hover-lift,
+  .hover-glow,
+  .reveal {
+    transition: none;
+  }
+
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

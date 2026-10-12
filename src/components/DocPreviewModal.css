@@ -284,3 +284,85 @@
   margin-left: auto;
 }
 .doc-modal__btn--close:hover { background: #475569; }
+
+.doc-modal__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.doc-modal__details > div {
+  min-width: 0;
+}
+
+.doc-modal__details dt {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.doc-modal__details dd {
+  overflow-wrap: anywhere;
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+}
+
+.doc-modal__file-frame {
+  width: 100%;
+  height: min(65vh, 680px);
+  margin-top: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.doc-modal__image {
+  display: block;
+  max-width: 100%;
+  max-height: 65vh;
+  margin: 1rem auto 0;
+  object-fit: contain;
+}
+
+.doc-modal__unavailable {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #78350f;
+  line-height: 1.5;
+}
+
+.doc-modal__download {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.doc-modal__btn:focus-visible,
+.doc-modal__close:focus-visible,
+.doc-modal__download:focus-visible {
+  outline: 3px solid #38bdf8;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .doc-modal__backdrop {
+    padding: 0.75rem;
+  }
+
+  .doc-modal__dialog {
+    padding: 1rem;
+  }
+
+  .doc-modal__actions,
+  .doc-modal__leader-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}

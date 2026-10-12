@@ -1,0 +1,27 @@
+.home-page__service-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #fff;
+  text-decoration: none;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.home-page__service-link:hover {
+  background: rgba(148, 163, 184, 0.2);
+  transform: translateX(3px);
+}
+
+.home-page__service-link:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-page__service-link {
+    transition: none;
+  }
+}

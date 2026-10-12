@@ -3,7 +3,7 @@ import './About.css'
 
 export default function About() {
   const { ref, visible } = useReveal()
-  const statsRef = useReveal()
+  const servicesRef = useReveal()
 
   return (
     <section id="about" className="about section" ref={ref}>
@@ -19,17 +19,16 @@ export default function About() {
               <span className="about__highlight">Educational Institutions</span>
             </h2>
             <p className="about__text">
-              CLEAR&TRANS is a comprehensive digital platform designed to eliminate the
-              bureaucratic bottlenecks in student clearance and transcript processing.
-              Our system connects departments, administrators, and students in a
-              seamless digital workflow.
+              CLEAR&TRANS brings the student-facing steps for clearance and transcript
+              requests into one guided portal experience. Students can see the information
+              they need to provide and return to follow request progress.
             </p>
             <div className="about__points">
               {[
-                'Automated clearance routing across departments',
-                'Digital transcript requests with e-signature',
-                'Real-time notifications and status updates',
-                'Detailed analytics and reporting',
+                'Two clearly separated student services',
+                'Document checklists attached to each request',
+                'Review stages visible to students and reviewers',
+                'A dashboard for request status and recent updates',
               ].map((point, i) => (
                 <div key={i} className="about__point" style={{
                   opacity: visible ? 1 : 0,
@@ -42,26 +41,26 @@ export default function About() {
               ))}
             </div>
           </div>
-          <div className="about__stats-grid" ref={statsRef.ref} style={{
-            opacity: statsRef.visible ? 1 : 0,
-            transform: statsRef.visible ? 'translateX(0)' : 'translateX(30px)',
+          <div className="about__stats-grid" ref={servicesRef.ref} style={{
+            opacity: servicesRef.visible ? 1 : 0,
+            transform: servicesRef.visible ? 'translateX(0)' : 'translateX(30px)',
             transition: 'all 0.7s ease 0.2s',
           }}>
             <div className="about__stat-card hover-lift">
-              <span className="about__stat-number">98%</span>
-              <span className="about__stat-desc">Faster clearance processing</span>
+              <span className="about__stat-number" aria-hidden="true">01</span>
+              <span className="about__stat-desc">Choose a service and submit a request</span>
             </div>
             <div className="about__stat-card hover-lift">
-              <span className="about__stat-number">0</span>
-              <span className="about__stat-desc">Paperwork required</span>
+              <span className="about__stat-number" aria-hidden="true">02</span>
+              <span className="about__stat-desc">Provide the required supporting details</span>
             </div>
             <div className="about__stat-card hover-lift">
-              <span className="about__stat-number">24/7</span>
-              <span className="about__stat-desc">System availability</span>
+              <span className="about__stat-number" aria-hidden="true">03</span>
+              <span className="about__stat-desc">Follow review progress through the portal</span>
             </div>
             <div className="about__stat-card hover-lift">
-              <span className="about__stat-number">4.9★</span>
-              <span className="about__stat-desc">User satisfaction</span>
+              <span className="about__stat-number" aria-hidden="true">04</span>
+              <span className="about__stat-desc">Check the outcome and any next steps</span>
             </div>
           </div>
         </div>

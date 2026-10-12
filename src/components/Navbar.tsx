@@ -4,15 +4,24 @@ import { useApp } from '../context/AppContext'
 import './Navbar.css'
 
 const studentLinks = [
-  { label: 'Home', path: '/' },
   { label: 'Dashboard', path: '/dashboard' },
   { label: 'Clearance', path: '/clearance' },
   { label: 'Transcript', path: '/transcript' },
+  { label: 'Documents', path: '/documents' },
+  { label: 'Help', path: '/#contact' },
 ]
 
 const leaderLinks = [
   { label: 'Home', path: '/' },
   { label: 'Reviews', path: '/leader' },
+  { label: 'Help', path: '/#contact' },
+]
+
+const publicLinks = [
+  { label: 'Home', path: '/' },
+  { label: 'Services', path: '/#features' },
+  { label: 'How it works', path: '/#about' },
+  { label: 'Help & support', path: '/#contact' },
 ]
 
 export default function Navbar() {
@@ -28,7 +37,7 @@ export default function Navbar() {
     setUserMenuOpen(false)
   }
 
-  const links = user?.role === 'leader' ? leaderLinks : studentLinks
+  const links = user?.role === 'leader' ? leaderLinks : user ? studentLinks : publicLinks
   const profileName = user?.role === 'student'
     ? user.profile.name
     : user?.role === 'leader'
@@ -41,22 +50,23 @@ export default function Navbar() {
     : ''
 
   return (
-    <nav className="navbar">
+    <nav className="navbar" aria-label="Main navigation">
       <div className="container navbar__inner">
-        <Link to="/" className="navbar__logo">
-          <img src="/ur-logo.png" alt="UR" className="navbar__logo-img" />
+        <Link to="/" className="navbar__logo" aria-label="University of Rwanda clearance and transcript portal home">
+          <img src="/ur-logo.png" alt="University of Rwanda logo" className="navbar__logo-img" />
           <span className="navbar__logo-text">
-            <span className="navbar__logo-brand">CLEAR&TRANS</span>
-            <span className="navbar__logo-sub">Univ. of Rwanda</span>
+            <span className="navbar__logo-brand">CLEARANCE & TRANSCRIPT</span>
+            <span className="navbar__logo-sub">Student services</span>
           </span>
         </Link>
 
-        <ul className={`navbar__links ${menuOpen ? 'navbar__links--open' : ''}`}>
+        <ul id="primary-navigation" className={`navbar__links ${menuOpen ? 'navbar__links--open' : ''}`}>
           {links.map(link => (
             <li key={link.path}>
               <Link
                 to={link.path}
                 className={`navbar__link ${location.pathname === link.path ? 'navbar__link--active' : ''}`}
+                aria-current={location.pathname === link.path ? 'page' : undefined}
                 onClick={() => setMenuOpen(false)}
               >
                 {link.label}
@@ -66,7 +76,12 @@ export default function Navbar() {
           <li>
             {user ? (
               <div className="navbar__user-wrap">
-                <button className="navbar__user-btn" onClick={() => setUserMenuOpen(!userMenuOpen)}>
+                <button
+                  className="navbar__user-btn"
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  aria-expanded={userMenuOpen}
+                  aria-haspopup="true"
+                >
                   <span className="navbar__user-avatar">{profileName.split(' ').map((n: string) => n[0]).join('')}</span>
                   <span className="navbar__user-name">{profileName.split(' ')[0]}</span>
                   {user.role === 'leader' && <span className="navbar__user-role">Leader</span>}
@@ -97,15 +112,18 @@ export default function Navbar() {
         </ul>
 
         <div className="navbar__right">
-          {user?.role === 'student' && (
-            <Link to="/clearance?chat=1" className="navbar__chat-link" title="AI Assistant">💬</Link>
+          {user && (
+            <Link to="/#contact" className="navbar__chat-link" aria-label="Open portal support contacts">?</Link>
           )}
         </div>
 
         <button
+          type="button"
           className={`navbar__burger ${menuOpen ? 'navbar__burger--open' : ''}`}
           onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Toggle menu"
+          aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={menuOpen}
+          aria-controls="primary-navigation"
         >
           <span />
           <span />

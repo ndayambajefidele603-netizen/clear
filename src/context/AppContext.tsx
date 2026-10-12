@@ -4,6 +4,7 @@ import {
   LEADERS, COLLEGES, type LeaderRecord, type StudentRecord,
   type MeetingSlot, type AuditEntry, generateMeetingSlots,
 } from '../database/schema'
+import { API_BASE, apiRequest } from '../lib/api'
 
 export type { StudentRecord, LeaderRecord, MeetingSlot, AuditEntry }
 
@@ -22,6 +23,7 @@ export interface RequestDocument {
   desc: string
   uploaded: boolean
   verified: boolean
+  reviewStatus?: 'approved' | 'correction_requested'
   verifiedBy?: string
   verifiedDate?: string
   fileName?: string
@@ -40,23 +42,6 @@ export interface StudentRequest {
   certificateRef?: string
 }
 
-export interface RegisteredAccount {
-  profile: StudentRecord
-  password: string
-}
-
-export interface RegisterStudentData {
-  name: string
-  email: string
-  password: string
-  phone: string
-  dob: string
-  college: string
-  program: string
-  year: string
-  studentId?: string
-}
-
 export type AppUser = {
   role: 'student'
   profile: StudentRecord
@@ -70,22 +55,26 @@ export type AppUser = {
 
 interface AppState {
   user: AppUser | null
+  sessionToken: string | null
+  sessionReady: boolean
   allStudents: StudentRecord[]
   meetingSlots: MeetingSlot[]
   notifications: AuditEntry[]
-  registerStudent: (data: RegisterStudentData) => { success: boolean; error?: string }
-  login: (email: string, password: string) => string | null
-  loginLeader: (email: string, password?: string) => string | null
+  setStudentSession: (profile: StudentRecord, token: string, requests: StudentRequest[]) => void
+  loginLeader: (email: string, password: string) => string | null
   logout: () => void
-  uploadDoc: (requestId: string, docId: string, fileName: string) => void
+  createRequest: (type: 'clearance' | 'transcript') => Promise<StudentRequest | null>
+  submitRequest: (requestId: string) => Promise<string | null>
+  uploadDoc: (requestId: string, docId: string, file: File) => Promise<string | null>
   verifyDoc: (studentEmail: string, requestId: string, docId: string, approved: boolean, leaderName: string) => void
-  approveAllDocs: (studentEmail: string, requestId: string, leaderName: string) => void
   approveRequest: (studentEmail: string, requestId: string, comment: string, leaderName: string, signature?: string) => void
   rejectRequest: (studentEmail: string, requestId: string, comment: string, leaderName: string, signature?: string) => void
   bookMeeting: (slotId: string, studentId: string, reason: string) => void
   cancelMeeting: (slotId: string) => void
   getStudentByEmail: (email: string) => StudentRecord | undefined
   getStudentById: (id: string) => StudentRecord | undefined
+  getDocumentPreviewUrl: (studentEmail: string, requestId: string, docId: string) => Promise<string | undefined>
+  hasDocumentPreviewUrl: (studentEmail: string, requestId: string, docId: string) => boolean
   dismissNotification: (id: string) => void
   requests: StudentRequest[]
   getStudentRequests: (email: string) => StudentRequest[]
@@ -95,82 +84,68 @@ interface AppState {
 const AppContext = createContext<AppState | null>(null)
 
 function pad(n: number) { return String(n).padStart(3, '0') }
+function attachmentKey(studentEmail: string, requestId: string, docId: string) {
+  return `${studentEmail.toLowerCase()}:${requestId}:${docId}`
+}
 
 const DOCS_CLEARANCE: RequestDocument[] = [
-  { id: 'd1', name: 'Student ID Card', desc: 'Clear copy of your student ID', uploaded: true, verified: false, fileName: 'student_id_card.pdf' },
-  { id: 'd2', name: 'Fee Clearance Statement', desc: 'Proof of paid tuition from Finance', uploaded: true, verified: false, fileName: 'fee_statement_2026.pdf' },
-  { id: 'd3', name: 'Library Clearance Slip', desc: 'Library return confirmation', uploaded: true, verified: false, fileName: 'library_clearance.pdf' },
-  { id: 'd4', name: 'Final Year Project Report', desc: 'Approved project/dissertation', uploaded: true, verified: false, fileName: 'final_project_report.pdf' },
-  { id: 'd5', name: 'Hostel Clearance Form', desc: 'Hostel vacate confirmation', uploaded: true, verified: false, fileName: 'hostel_form.pdf' },
+  { id: 'd1', name: 'Student ID Card', desc: 'Clear copy of your student ID', uploaded: false, verified: false, fileName: '' },
+  { id: 'd2', name: 'Fee Clearance Statement', desc: 'Proof of paid tuition from Finance', uploaded: false, verified: false, fileName: '' },
+  { id: 'd3', name: 'Library Clearance Slip', desc: 'Library return confirmation', uploaded: false, verified: false, fileName: '' },
+  { id: 'd4', name: 'Final Year Project Report', desc: 'Approved project/dissertation', uploaded: false, verified: false, fileName: '' },
+  { id: 'd5', name: 'Hostel Clearance Form', desc: 'Hostel vacate confirmation', uploaded: false, verified: false, fileName: '' },
 ]
 
 const DOCS_TRANSCRIPT: RequestDocument[] = [
-  { id: 't1', name: 'Transcript Application Form', desc: 'Signed application form', uploaded: true, verified: false, fileName: 'transcript_application.pdf' },
-  { id: 't2', name: 'ID Copy', desc: 'Copy of student ID or national passport', uploaded: true, verified: false, fileName: 'student_id_copy.pdf' },
-  { id: 't3', name: 'Processing Fee Receipt', desc: 'Proof of fee payment (MoMo / Irembo)', uploaded: true, verified: false, fileName: 'fee_payment_slip.pdf' },
+  { id: 't1', name: 'Transcript Application Form', desc: 'Signed application form', uploaded: false, verified: false, fileName: '' },
+  { id: 't2', name: 'ID Copy', desc: 'Copy of student ID or national passport', uploaded: false, verified: false, fileName: '' },
+  { id: 't3', name: 'Processing Fee Receipt', desc: 'Proof of fee payment (MoMo / Irembo)', uploaded: false, verified: false, fileName: '' },
 ]
 
-function createRequest(type: 'clearance' | 'transcript'): StudentRequest {
-  const now = new Date()
-  const prefix = type === 'clearance' ? 'CLR' : 'TRS'
-  return {
-    id: `${prefix}-${now.getFullYear()}-${pad(Math.floor(Math.random() * 900) + 100)}`,
-    type,
-    status: 'in_progress',
-    currentLevel: 1,
-    steps: LEADERS.map(l => ({ level: l.level, status: 'pending' as const })),
-    docs: type === 'clearance' ? DOCS_CLEARANCE.map(d => ({ ...d })) : DOCS_TRANSCRIPT.map(d => ({ ...d })),
-    updates: [{
-      id: `u-${Date.now()}-${Math.random()}`,
-      timestamp: now.toLocaleDateString(),
-      actor: 'System',
-      action: 'Submitted',
-      details: `${type === 'clearance' ? 'Clearance' : 'Transcript'} request submitted. Awaiting Level 1 (${LEADERS[0].title}) review.`,
-      level: 0,
-    }],
-    createdAt: now.toLocaleDateString(),
-  }
-}
-
 const STORAGE_KEYS = {
-  USERS: 'clear&trans_registered_users',
   REQUESTS: 'clear&trans_requests_store',
   SESSION: 'clear&trans_active_session',
-  PASSWORDS: 'clear&trans_student_credentials',
+  REQUESTS_MIGRATED: 'clear&trans_requests_migrated',
 }
 
-function getGeneratedStudentPassword(student: StudentRecord): string {
-  const digits = student.id.replace(/\D/g, '').slice(-6)
-  return `UR@${digits || '000000'}`
+interface StoredStudentSession {
+  token: string
+  profile: StudentRecord
 }
 
 function getGeneratedLeaderPassword(leader: LeaderRecord): string {
-  const initials = leader.name.split(' ').map(part => part[0]).join('').toUpperCase()
+  const titles = new Set(['dr', 'prof', 'mr', 'mrs', 'ms'])
+  const initials = leader.name
+    .split(/\s+/)
+    .filter(part => !titles.has(part.replace(/\./g, '').toLowerCase()))
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
   return `${initials || 'LEADER'}123`
 }
 
-function loadRegisteredUsers(): RegisteredAccount[] {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.USERS)
-    return data ? JSON.parse(data) : []
-  } catch {
-    return []
-  }
+export function getLeaderPreviewPassword(leader: LeaderRecord): string {
+  return getGeneratedLeaderPassword(leader)
 }
 
-function saveRegisteredUsers(users: RegisteredAccount[]) {
+function loadStudentSession(): StoredStudentSession | null {
   try {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users))
-  } catch (err) {
-    console.error('Failed to save registered users', err)
+    const value = localStorage.getItem(STORAGE_KEYS.SESSION)
+    if (!value) return null
+    const parsed = JSON.parse(value) as StoredStudentSession
+    return parsed.token && parsed.profile ? parsed : null
+  } catch (error) {
+    console.error('Could not read saved portal session', error)
+    return null
   }
 }
 
 function loadRequestsStore(): Record<string, StudentRequest[]> {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.REQUESTS)
-    return data ? JSON.parse(data) : {}
-  } catch {
+    return data ? JSON.parse(data) as Record<string, StudentRequest[]> : {}
+  } catch (error) {
+    console.error('Failed to load requests store', error)
     return {}
   }
 }
@@ -178,76 +153,61 @@ function loadRequestsStore(): Record<string, StudentRequest[]> {
 function saveRequestsStore(store: Record<string, StudentRequest[]>) {
   try {
     localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(store))
-  } catch (err) {
-    console.error('Failed to save requests store', err)
-  }
-}
-
-function loadCredentialMap(): Record<string, string> {
-  try {
-    const data = localStorage.getItem(STORAGE_KEYS.PASSWORDS)
-    return data ? JSON.parse(data) : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveCredentialMap(map: Record<string, string>) {
-  try {
-    localStorage.setItem(STORAGE_KEYS.PASSWORDS, JSON.stringify(map))
-  } catch (err) {
-    console.error('Failed to save credential map', err)
+  } catch (error) {
+    console.error('Failed to save legacy reviewer preview requests', error)
   }
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [registeredAccounts, setRegisteredAccounts] = useState<RegisteredAccount[]>(() => loadRegisteredUsers())
-  const [credentialMap, setCredentialMap] = useState<Record<string, string>>(() => {
-    const saved = loadCredentialMap()
-    const seeded = Object.fromEntries(STUDENT_DB.map(student => [student.email.toLowerCase(), getGeneratedStudentPassword(student)]))
-    const leaders = Object.fromEntries(LEADERS.map(leader => [leader.email.toLowerCase(), getGeneratedLeaderPassword(leader)]))
-    return { ...seeded, ...leaders, ...saved }
-  })
-  const [allStudents, setAllStudents] = useState<StudentRecord[]>(() => {
-    const registered = loadRegisteredUsers().map(a => a.profile)
-    const combined = [...registered, ...STUDENT_DB]
-    const seen = new Set<string>()
-    return combined.filter(s => {
-      const email = s.email.toLowerCase()
-      if (seen.has(email)) return false
-      seen.add(email)
-      return true
-    })
-  })
-
-  const [user, setUser] = useState<AppUser | null>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.SESSION)
-      return saved ? JSON.parse(saved) : null
-    } catch {
-      return null
-    }
-  })
+  const [savedSession] = useState(() => loadStudentSession())
+  const [sessionToken, setSessionToken] = useState<string | null>(savedSession?.token || null)
+  const [sessionReady, setSessionReady] = useState(!savedSession)
+  const [allStudents, setAllStudents] = useState<StudentRecord[]>(STUDENT_DB)
+  const [user, setUser] = useState<AppUser | null>(
+    savedSession ? { role: 'student', profile: savedSession.profile, requests: [] } : null,
+  )
 
   const [meetingSlots, setMeetingSlots] = useState(() => generateMeetingSlots())
   const [notifications, setNotifications] = useState<AuditEntry[]>([])
+  const documentPreviewUrls = useRef(new Map<string, string>())
 
-  // Global request store: studentEmail -> StudentRequest[]
   const requestsStore = useRef<Record<string, StudentRequest[]>>(loadRequestsStore())
   const [, forceRender] = useState(0)
 
-  // Persist session to localStorage
   useEffect(() => {
-    try {
-      if (user) {
-        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(user))
-      } else {
+    if (!savedSession) return
+    let active = true
+    apiRequest<{ profile: StudentRecord; requests: StudentRequest[] }>('/api/auth/session', {}, savedSession.token)
+      .then(result => {
+        if (!active) return
+        requestsStore.current[savedSession.profile.email.toLowerCase()] = result.requests
+        setUser({ role: 'student', profile: result.profile, requests: result.requests })
+        setAllStudents(previous => [result.profile, ...previous.filter(student => student.email.toLowerCase() !== result.profile.email.toLowerCase())])
+      })
+      .catch(error => {
+        console.error('Could not restore portal session', error)
+        if (!active) return
         localStorage.removeItem(STORAGE_KEYS.SESSION)
-      }
-    } catch (err) {
-      console.error('Failed to persist session', err)
+        setSessionToken(null)
+        setUser(null)
+      })
+      .finally(() => {
+        if (active) setSessionReady(true)
+      })
+    return () => { active = false }
+  }, [savedSession])
+
+  useEffect(() => {
+    if (!sessionToken || !user || user.role !== 'student') {
+      if (!sessionToken) localStorage.removeItem(STORAGE_KEYS.SESSION)
+      return
     }
-  }, [user])
+    try {
+      localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({ token: sessionToken, profile: user.profile }))
+    } catch (error) {
+      console.error('Could not save portal session', error)
+    }
+  }, [sessionToken, user])
 
   const addNotif = useCallback((entry: AuditEntry) => {
     setNotifications(prev => [entry, ...prev])
@@ -261,158 +221,137 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return allStudents.find(s => s.id === id)
   }, [allStudents])
 
-  const getStudentRequests = useCallback((email: string): StudentRequest[] => {
-    const key = email.toLowerCase()
-    if (!requestsStore.current[key]) {
-      const initial = [createRequest('clearance'), createRequest('transcript')]
-      requestsStore.current[key] = initial
-      saveRequestsStore(requestsStore.current)
+  const getDocumentPreviewUrl = useCallback(async (studentEmail: string, requestId: string, docId: string) => {
+    const key = attachmentKey(studentEmail, requestId, docId)
+    const existingUrl = documentPreviewUrls.current.get(key)
+    if (existingUrl) return existingUrl
+    if (sessionToken && user?.role === 'student' && user.profile.email.toLowerCase() === studentEmail.toLowerCase()) {
+      const response = await fetch(`${API_BASE}/api/student/requests/${encodeURIComponent(requestId)}/documents/${encodeURIComponent(docId)}`, {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      })
+      if (!response.ok) {
+        const message = await response.text()
+        throw new Error(message || 'Could not load this document from the portal.')
+      }
+      const url = URL.createObjectURL(await response.blob())
+      documentPreviewUrls.current.set(key, url)
+      forceRender(version => version + 1)
+      return url
     }
-    return requestsStore.current[key]
+    return undefined
+  }, [sessionToken, user])
+
+  const hasDocumentPreviewUrl = useCallback((studentEmail: string, requestId: string, docId: string) => {
+    return documentPreviewUrls.current.has(attachmentKey(studentEmail, requestId, docId))
   }, [])
 
-  // ───── Student Registration ─────
-  const registerStudent = useCallback((data: RegisterStudentData): { success: boolean; error?: string } => {
-    const emailLower = data.email.trim().toLowerCase()
-    if (!emailLower) {
-      return { success: false, error: 'Please enter a valid email address.' }
+  const getStudentRequests = useCallback((email: string): StudentRequest[] => {
+    const key = email.toLowerCase()
+    return requestsStore.current[key] || []
+  }, [])
+
+  const setStudentSession = useCallback((profile: StudentRecord, token: string, studentRequests: StudentRequest[]) => {
+    const email = profile.email.toLowerCase()
+    requestsStore.current[email] = studentRequests
+    setSessionToken(token)
+    setAllStudents(previous => [profile, ...previous.filter(student => student.email.toLowerCase() !== email)])
+    setUser({ role: 'student', profile, requests: studentRequests })
+    setSessionReady(true)
+  }, [])
+
+  const saveStudentRequests = useCallback(async (email: string, studentRequests: StudentRequest[]) => {
+    if (!sessionToken) throw new Error('Your session has expired. Please sign in again.')
+    await apiRequest<{ saved: boolean }>('/api/student/requests', {
+      method: 'PUT',
+      body: JSON.stringify({ requests: studentRequests }),
+    }, sessionToken)
+    requestsStore.current[email.toLowerCase()] = studentRequests
+    setUser(current => current?.role === 'student' && current.profile.email.toLowerCase() === email.toLowerCase()
+      ? { ...current, requests: studentRequests }
+      : current)
+  }, [sessionToken])
+
+  const createRequest = useCallback(async (type: 'clearance' | 'transcript'): Promise<StudentRequest | null> => {
+    if (!user || user.role !== 'student') return null
+    const key = user.profile.email.toLowerCase()
+    const existing = getStudentRequests(key).find(req => req.type === type)
+    if (existing) return existing
+
+    const now = new Date()
+    const prefix = type === 'clearance' ? 'CLR' : 'TRS'
+    const request: StudentRequest = {
+      id: `${prefix}-${now.getFullYear()}-${pad(Math.floor(Math.random() * 900) + 100)}`,
+      type,
+      status: 'draft',
+      currentLevel: 1,
+      steps: LEADERS.map(leader => ({ level: leader.level, status: 'pending' as const })),
+      docs: (type === 'clearance' ? DOCS_CLEARANCE : DOCS_TRANSCRIPT).map(doc => ({ ...doc, uploaded: false, verified: false, fileName: '' })),
+      updates: [{
+        id: `u-${Date.now()}-${Math.random()}`,
+        timestamp: now.toLocaleDateString(),
+        actor: 'System',
+        action: 'Draft Created',
+        details: `${type === 'clearance' ? 'Clearance' : 'Transcript'} checklist created. Upload the required documents, then submit for review.`,
+        level: 0,
+      }],
+      createdAt: now.toLocaleDateString(),
     }
-    if (!data.password || data.password.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters long.' }
-    }
 
-    const existing = registeredAccounts.find(a => a.profile.email.toLowerCase() === emailLower)
-    if (existing) {
-      return { success: false, error: 'An account with this email address already exists. Please log in.' }
-    }
-
-    const collegeObj = COLLEGES.find(c => c.name === data.college || c.code === data.college) || COLLEGES[0]
-    const collegeCode = collegeObj.code
-    const currentYear = new Date().getFullYear()
-    const studentId = data.studentId?.trim() || `UR/${currentYear}/${collegeCode}/${pad(Math.floor(Math.random() * 899) + 100)}`
-
-    const newProfile: StudentRecord = {
-      id: studentId,
-      name: data.name.trim(),
-      email: emailLower,
-      phone: data.phone.trim() || '+250 788 000 000',
-      gender: 'M',
-      dob: data.dob || '2001-01-01',
-      college: collegeObj.name,
-      program: data.program.trim() || collegeObj.programs[0],
-      year: data.year || 'Year 1',
-      enrollmentYear: currentYear,
-      status: 'active',
-    }
-
-    const newAccount: RegisteredAccount = {
-      profile: newProfile,
-      password: data.password,
-    }
-
-    const updatedAccounts = [newAccount, ...registeredAccounts]
-    setRegisteredAccounts(updatedAccounts)
-    saveRegisteredUsers(updatedAccounts)
-
-    setCredentialMap(prev => {
-      const next = { ...prev, [emailLower]: data.password }
-      saveCredentialMap(next)
-      return next
-    })
-
-    setAllStudents(prev => [newProfile, ...prev.filter(s => s.email.toLowerCase() !== emailLower)])
-
-    const studentRequests = [createRequest('clearance'), createRequest('transcript')]
-    requestsStore.current[emailLower] = studentRequests
-    saveRequestsStore(requestsStore.current)
-
-    const newUser: AppUser = {
-      role: 'student',
-      profile: newProfile,
-      requests: studentRequests,
-    }
-    setUser(newUser)
-
+    const nextRequests = [...getStudentRequests(key), request]
+    await saveStudentRequests(key, nextRequests)
     addNotif({
       id: `n-${Date.now()}`,
       timestamp: new Date().toLocaleTimeString(),
       actor: 'System',
-      action: 'Account Created',
-      details: `Welcome ${newProfile.name}! Your UR clearance and transcript accounts are ready.`,
+      action: 'Request Created',
+      details: `${type === 'clearance' ? 'Clearance' : 'Transcript'} checklist ${request.id} is ready for documents.`,
       level: 0,
     })
+    return request
+  }, [addNotif, getStudentRequests, saveStudentRequests, user])
 
-    return { success: true }
-  }, [registeredAccounts, addNotif])
-
-  // ───── Student Login ─────
-  const login = useCallback((email: string, password: string): string | null => {
-    const lower = email.trim().toLowerCase()
-    if (!lower) return 'Please enter your university email.'
-    if (!password) return 'Please enter your password.'
-
-    // 1. Check custom registered accounts
-    const registered = registeredAccounts.find(a => a.profile.email.toLowerCase() === lower)
-    if (registered) {
-      const expectedPassword = credentialMap[lower] || registered.password
-      if (expectedPassword !== password) {
-        return 'Incorrect password. Please verify your credentials and try again.'
-      }
-      const studentReqs = getStudentRequests(lower)
-      setUser({
-        role: 'student',
-        profile: registered.profile,
-        requests: studentReqs,
-      })
-      addNotif({
-        id: `n-${Date.now()}`,
-        timestamp: new Date().toLocaleTimeString(),
-        actor: 'System',
-        action: 'Login',
-        details: `Welcome back, ${registered.profile.name}!`,
+  const submitRequest = useCallback(async (requestId: string): Promise<string | null> => {
+    if (!user || user.role !== 'student') return 'Sign in as a student to submit a request.'
+    const email = user.profile.email.toLowerCase()
+    const existing = getStudentRequests(email)
+    const target = existing.find(request => request.id === requestId)
+    if (!target) return 'Request not found.'
+    if (target.status !== 'draft') return 'This request has already been submitted.'
+    const missing = target.docs.filter(doc => !doc.uploaded)
+    if (missing.length) return `Upload all required documents before submitting. ${missing.length} document${missing.length === 1 ? '' : 's'} remaining.`
+    const now = new Date().toLocaleDateString()
+    const updated = existing.map(request => request.id === requestId ? {
+      ...request,
+      status: 'in_progress' as const,
+      updates: [...request.updates, {
+        id: `u-${Date.now()}`, timestamp: now,
+        actor: user.profile.name, action: 'Submitted',
+        details: `${request.type === 'clearance' ? 'Clearance' : 'Transcript'} request submitted. Awaiting Level 1 (${LEADERS[0].title}) review.`,
         level: 0,
-      })
+      }],
+    } : request)
+    try {
+      await saveStudentRequests(email, updated)
       return null
+    } catch (error) {
+      console.error('Failed to submit request', error)
+      return error instanceof Error ? error.message : 'Could not submit this request. Please try again.'
     }
-
-    // 2. Check pre-seeded database students with real credentials
-    const seededStudent = allStudents.find(s => s.email.toLowerCase() === lower)
-    if (seededStudent) {
-      const expectedPassword = credentialMap[lower] || getGeneratedStudentPassword(seededStudent)
-      if (expectedPassword !== password) {
-        return 'Incorrect password. Use your student ID-based password format: UR@123456.'
-      }
-      const studentReqs = getStudentRequests(lower)
-      setUser({
-        role: 'student',
-        profile: seededStudent,
-        requests: studentReqs,
-      })
-      addNotif({
-        id: `n-${Date.now()}`,
-        timestamp: new Date().toLocaleTimeString(),
-        actor: 'System',
-        action: 'Login',
-        details: `Welcome ${seededStudent.name}!`,
-        level: 0,
-      })
-      return null
-    }
-
-    return 'No student account found with this email. Please click "Create Account" to register.'
-  }, [registeredAccounts, allStudents, getStudentRequests, addNotif])
+  }, [getStudentRequests, saveStudentRequests, user])
 
   // ───── Leader Login ─────
-  const loginLeader = useCallback((email: string, password?: string): string | null => {
+  const loginLeader = useCallback((email: string, password: string): string | null => {
     const lower = email.trim().toLowerCase()
     const leader = LEADERS.find(l => l.email.toLowerCase() === lower)
     if (!leader) return 'Leader not found. Use a valid UR leader email.'
+    if (!password) return 'Please enter your leader password.'
 
-    const expectedPassword = credentialMap[lower] || getGeneratedLeaderPassword(leader)
-    if (password && password.trim() !== '' && password !== expectedPassword && password !== 'leader123') {
-      return 'Incorrect leader password. Use the institution-issued leader credential.'
+    const expectedPassword = getGeneratedLeaderPassword(leader)
+    if (password !== expectedPassword) {
+      return 'Incorrect password for this local preview reviewer account.'
     }
 
+    setSessionToken(null)
     setUser({
       role: 'leader',
       profile: leader,
@@ -426,58 +365,114 @@ export function AppProvider({ children }: { children: ReactNode }) {
       level: leader.level,
     })
     return null
-  }, [addNotif, allStudents, credentialMap])
+  }, [addNotif, allStudents])
 
   const logout = useCallback(() => {
+    if (sessionToken) {
+      void apiRequest<{ loggedOut: boolean }>('/api/auth/logout', { method: 'POST' }, sessionToken)
+        .catch(error => console.error('Could not invalidate portal session', error))
+    }
     setUser(null)
+    setSessionToken(null)
     localStorage.removeItem(STORAGE_KEYS.SESSION)
     setNotifications([])
-  }, [])
+  }, [sessionToken])
 
-  const uploadDoc = useCallback((requestId: string, docId: string, fileName: string) => {
-    if (!user || user.role !== 'student') return
+  const uploadDoc = useCallback(async (requestId: string, docId: string, file: File) => {
+    if (!user || user.role !== 'student') return 'Sign in as a student to select a document.'
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    const isImage = file.type.startsWith('image/')
+    if (!isPdf && !isImage) return 'Choose a PDF or image file.'
+    if (file.size > 10 * 1024 * 1024) return 'The selected file exceeds the 10 MB limit.'
     const key = user.profile.email.toLowerCase()
+    const fileKey = attachmentKey(key, requestId, docId)
+    const currentRequest = getStudentRequests(key).find(req => req.id === requestId)
+    if (!currentRequest || !['draft', 'in_progress'].includes(currentRequest.status) || !currentRequest.docs.some(doc => doc.id === docId)) {
+      return 'This document requirement is not part of an active request.'
+    }
+    if (!sessionToken) return 'Sign in again before uploading documents.'
+    try {
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result
+          if (typeof result !== 'string') reject(new Error('The selected file could not be read.'))
+          else resolve(result.slice(result.indexOf(',') + 1))
+        }
+        reader.onerror = () => reject(reader.error || new Error('The selected file could not be read.'))
+        reader.readAsDataURL(file)
+      })
+      await apiRequest<{ uploaded: boolean }>(`/api/student/requests/${encodeURIComponent(requestId)}/documents/${encodeURIComponent(docId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'), data }),
+      }, sessionToken)
+    } catch (error) {
+      console.error('Failed to persist request attachment', error)
+      return error instanceof Error ? error.message : 'Could not upload the file. Please try again.'
+    }
+    const previousUrl = documentPreviewUrls.current.get(fileKey)
+    if (previousUrl) URL.revokeObjectURL(previousUrl)
+    documentPreviewUrls.current.set(fileKey, URL.createObjectURL(file))
     const updated = (requestsStore.current[key] || user.requests).map(req => {
       if (req.id !== requestId) return req
       return {
         ...req,
-        docs: req.docs.map(d => d.id === docId ? { ...d, uploaded: true, fileName } : d),
+        docs: req.docs.map(d => d.id === docId ? {
+          ...d,
+          uploaded: true,
+          verified: false,
+          reviewStatus: undefined,
+          verifiedBy: undefined,
+          verifiedDate: undefined,
+          fileName: file.name,
+        } : d),
         updates: [...req.updates, {
           id: `u-${Date.now()}`, timestamp: new Date().toLocaleDateString(),
-          actor: user.profile.name, action: 'Uploaded Document',
-          details: `"${fileName}" uploaded. Ready for leader verification.`,
+          actor: user.profile.name, action: 'Selected Document',
+          details: `"${file.name}" was uploaded to the portal for review.`,
           level: req.currentLevel,
         }],
       }
     })
-    requestsStore.current[key] = updated
-    saveRequestsStore(requestsStore.current)
-    setUser({ ...user, requests: updated })
+    try {
+      await saveStudentRequests(key, updated)
+    } catch (error) {
+      console.error('Failed to save document status', error)
+      return error instanceof Error ? error.message : 'Could not save the document status.'
+    }
     addNotif({
       id: `n-${Date.now()}`, timestamp: new Date().toLocaleTimeString(),
-      actor: user.profile.name, action: 'Upload',
-      details: `Document "${fileName}" uploaded for ${requestId}.`,
+      actor: user.profile.name, action: 'Document Selected',
+      details: `Document "${file.name}" uploaded to the portal for ${requestId}.`,
       level: 0,
     })
-  }, [user, addNotif])
+    forceRender(version => version + 1)
+    return null
+  }, [user, addNotif, getStudentRequests, saveStudentRequests, sessionToken])
 
   const verifyDoc = useCallback((studentEmail: string, requestId: string, docId: string, approved: boolean, leaderName: string) => {
+    if (!user || user.role !== 'leader' || user.profile.name !== leaderName) return
     const key = studentEmail.toLowerCase()
+    if (!documentPreviewUrls.current.has(attachmentKey(key, requestId, docId))) return
     const existing = getStudentRequests(key)
+    const targetRequest = existing.find(req => req.id === requestId)
+    if (!targetRequest || targetRequest.status !== 'in_progress' || targetRequest.currentLevel !== user.profile.level || !targetRequest.docs.some(doc => doc.id === docId && doc.uploaded)) return
     const updated = existing.map(req => {
-      const isMatch = req.id === requestId || (requestId.startsWith('CLR') && req.type === 'clearance') || (requestId.startsWith('TRS') && req.type === 'transcript')
+      const isMatch = req.id === requestId
       if (!isMatch) return req
       return {
         ...req,
-        docs: req.docs.map(d => d.id === docId ? { ...d, verified: approved, verifiedBy: leaderName, verifiedDate: new Date().toLocaleDateString() } : d),
+        docs: req.docs.map(d => d.id === docId && d.uploaded ? {
+          ...d,
+          verified: approved,
+          reviewStatus: approved ? 'approved' as const : 'correction_requested' as const,
+          verifiedBy: leaderName,
+          verifiedDate: new Date().toLocaleDateString(),
+        } : d),
       }
     })
     requestsStore.current[key] = updated
     saveRequestsStore(requestsStore.current)
-
-    if (user?.role === 'student' && user.profile.email.toLowerCase() === key) {
-      setUser({ ...user, requests: updated })
-    }
 
     addNotif({
       id: `n-${Date.now()}`, timestamp: new Date().toLocaleTimeString(),
@@ -488,39 +483,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     forceRender(n => n + 1)
   }, [addNotif, getStudentRequests, user])
 
-  const approveAllDocs = useCallback((studentEmail: string, requestId: string, leaderName: string) => {
-    const key = studentEmail.toLowerCase()
+  const advanceStudentRequest = useCallback((key: string, requestId: string, comment: string, leaderName: string, approved: boolean, signature?: string): StudentRequest | null => {
+    if (!user || user.role !== 'leader' || user.profile.name !== leaderName) return null
     const existing = getStudentRequests(key)
-    const now = new Date().toLocaleDateString()
-    const updated = existing.map(req => {
-      const isMatch = req.id === requestId || (requestId.startsWith('CLR') && req.type === 'clearance') || (requestId.startsWith('TRS') && req.type === 'transcript')
-      if (!isMatch) return req
-      return {
-        ...req,
-        docs: req.docs.map(d => ({ ...d, uploaded: true, verified: true, verifiedBy: leaderName, verifiedDate: now })),
-      }
-    })
-    requestsStore.current[key] = updated
-    saveRequestsStore(requestsStore.current)
-
-    if (user?.role === 'student' && user.profile.email.toLowerCase() === key) {
-      setUser({ ...user, requests: updated })
-    }
-
-    addNotif({
-      id: `n-${Date.now()}`, timestamp: new Date().toLocaleTimeString(),
-      actor: leaderName, action: 'All Documents Approved',
-      details: `All documents verified and approved by ${leaderName}.`,
-      level: 0,
-    })
-    forceRender(n => n + 1)
-  }, [addNotif, getStudentRequests, user])
-
-  function advanceStudentRequest(key: string, requestId: string, comment: string, leaderName: string, approved: boolean, signature?: string): StudentRequest | null {
-    const existing = getStudentRequests(key)
+    const targetRequest = existing.find(req => req.id === requestId)
+    if (!targetRequest || targetRequest.status !== 'in_progress' || targetRequest.currentLevel !== user.profile.level) return null
+    if (approved && (targetRequest.docs.length === 0 || targetRequest.docs.some(doc => !doc.uploaded || !doc.verified || !documentPreviewUrls.current.has(attachmentKey(key, requestId, doc.id))))) return null
     let updatedReq: StudentRequest | null = null
     const updated = existing.map(req => {
-      const isMatch = req.id === requestId || (requestId.startsWith('CLR') && req.type === 'clearance') || (requestId.startsWith('TRS') && req.type === 'transcript')
+      const isMatch = req.id === requestId
       if (!isMatch) return req
 
       const now = new Date().toLocaleDateString()
@@ -537,14 +508,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
             updates: [...req.updates, {
               id: `u-${Date.now()}`, timestamp: now,
               actor: leaderName, action: 'Final Approval & Issuance',
-              details: `✨ All 4 institutional approval levels completed! Official ${req.type === 'clearance' ? 'Clearance Certificate' : 'Academic Transcript'} issued with ref ${certRef}.`,
+              details: `${req.type === 'clearance' ? 'Clearance' : 'Transcript'} request completed in the portal preview. Reference: ${certRef}.`,
               level: 4,
             }],
           }
           addNotif({
             id: `n-${Date.now()}`, timestamp: new Date().toLocaleTimeString(),
-            actor: 'Office of the Registrar', action: 'Official Issuance',
-            details: `🎉 ${req.type === 'clearance' ? 'Clearance' : 'Transcript'} ${req.id} fully approved and issued! Reference: ${certRef}`,
+            actor: leaderName, action: 'Request Completed',
+            details: `${req.type === 'clearance' ? 'Clearance' : 'Transcript'} request ${req.id} completed. Reference: ${certRef}`,
             level: 4,
           })
         } else {
@@ -589,20 +560,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     requestsStore.current[key] = updated
     saveRequestsStore(requestsStore.current)
 
-    if (user?.role === 'student' && user.profile.email.toLowerCase() === key) {
-      setUser({ ...user, requests: updated })
-    }
     forceRender(n => n + 1)
     return updatedReq
-  }
+  }, [addNotif, getStudentRequests, user])
 
   const approveRequest = useCallback((studentEmail: string, requestId: string, comment: string, leaderName: string, signature?: string) => {
     advanceStudentRequest(studentEmail.toLowerCase(), requestId, comment, leaderName, true, signature)
-  }, [])
+  }, [advanceStudentRequest])
 
   const rejectRequest = useCallback((studentEmail: string, requestId: string, comment: string, leaderName: string, signature?: string) => {
     advanceStudentRequest(studentEmail.toLowerCase(), requestId, comment, leaderName, false, signature)
-  }, [])
+  }, [advanceStudentRequest])
 
   const bookMeeting = useCallback((slotId: string, studentId: string, reason: string) => {
     setMeetingSlots(prev => prev.map(s =>
@@ -637,11 +605,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      user, allStudents, meetingSlots, notifications, requests,
-      registerStudent, login, loginLeader, logout,
-      uploadDoc, verifyDoc, approveAllDocs, approveRequest, rejectRequest,
+      user, sessionToken, sessionReady, allStudents, meetingSlots, notifications, requests,
+      setStudentSession, loginLeader, logout,
+      createRequest, submitRequest, uploadDoc, verifyDoc, approveRequest, rejectRequest,
       bookMeeting, cancelMeeting,
-      getStudentByEmail, getStudentById, dismissNotification, getStudentRequests,
+      getStudentByEmail, getStudentById, getDocumentPreviewUrl, hasDocumentPreviewUrl, dismissNotification, getStudentRequests,
       addUpdate,
     }}>
       {children}

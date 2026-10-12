@@ -3,13 +3,13 @@ export interface StudentRecord {
   name: string
   email: string
   phone: string
-  gender: 'M' | 'F'
+  gender?: 'M' | 'F'
   dob: string
   college: string
   program: string
   year: string
-  enrollmentYear: number
-  status: 'active' | 'graduated' | 'withdrawn'
+  enrollmentYear?: number
+  status?: 'active' | 'graduated' | 'withdrawn'
 }
 
 export interface LeaderRecord {
@@ -106,80 +106,30 @@ export const LEADERS: LeaderRecord[] = [
     id: 'principal', name: 'Prof. Patrick Habimana', email: 'p.habimana@ur.ac.rw',
     title: 'College Principal', level: 3, college: 'CST',
     phone: '+250 788 500 600', avatar: 'PH',
-    bio: 'Principal of the College of Science and Technology. Authorizes final clearance.',
+    bio: 'College-level reviewer for the clearance and transcript portal preview workflow.',
     office: 'CST Building, 3rd Floor', officeHours: 'Mon-Fri 09:00-11:00',
   },
   {
     id: 'registrar', name: 'Marie Claire Niyonzima', email: 'mc.niyonzima@ur.ac.rw',
     title: 'Registrar / Dean of Students', level: 4, college: 'UR Headquarters',
     phone: '+250 788 700 800', avatar: 'MN',
-    bio: 'University Registrar. Issues official clearance certificates and transcripts.',
+    bio: 'Final reviewer for the portal preview workflow. This preview does not issue official University records.',
     office: 'UR Headquarters, Room 401', officeHours: 'Mon-Fri 08:00-17:00',
   },
 ]
-
-// ───── Generate 500+ students ─────
-
-const FIRST_NAMES_M = ['Jean','Patrick','Emmanuel','David','Samuel','Joseph','Daniel','Peter','James','John','Paul','Michael','Andrew','Eric','Charles','Henry','Frank','Albert','Kevin','Brian','George','Ronald','Edward','Thomas','Christopher','Alex','Oliver','William','Robert','Richard']
-const FIRST_NAMES_F = ['Marie','Alice','Diane','Esther','Grace','Ruth','Sarah','Elizabeth','Catherine','Agnes','Beatrice','Joyce','Claire','Louise','Anne','Jane','Monique','Helene','Rose','Yvonne','Olivier','Lydia','Naomi','Rachel','Patricia','Deborah','Sandra','Jennifer','Dorcas','Florence']
-const LAST_NAMES = ['Ndayambaje','Mugabo','Uwimana','Hakizimana','Habimana','Niyonzima','Mukamana','Rutayisire','Mugisha','Nshimiyimana','Bizimana','Tuyishime','Imanishimwe','Abimana','Nkurunziza','Gakuba','Muhire','Rurangwa','Bazimaziki','Ntawuyirushintege','Karorero','Mpano','Habiyaremye','Rugamba','Nzeyimana','Niyibizi','Rukundo','Mbanda','Nteziryayo','Bana']
-
-const PROGRAMS_BY_COLLEGE: Record<string, string[]> = {}
-COLLEGES.forEach(c => { PROGRAMS_BY_COLLEGE[c.code] = c.programs })
-
-function random<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
-function pad(n: number, len = 3) { return String(n).padStart(len, '0') }
-
-function generatePhone(): string {
-  return `+250 7${random(['88','89','87','86','85'])} ${pad(Math.floor(Math.random()*900)+100)} ${pad(Math.floor(Math.random()*900)+100)}`
-}
-
-function generateEmail(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z.]/g, '') + '@ur.ac.rw'
-}
-
-function generateDOB(year: number): string {
-  const m = pad(Math.floor(Math.random() * 12) + 1, 2)
-  const d = pad(Math.floor(Math.random() * 28) + 1, 2)
-  return `${year}-${m}-${d}`
-}
-
-export function generateStudentDatabase(count = 520): StudentRecord[] {
-  const students: StudentRecord[] = []
-  let id = 2022001
-
-  for (let i = 0; i < count; i++) {
-    const gender = Math.random() > 0.5 ? 'M' as const : 'F' as const
-    const firstNames = gender === 'M' ? FIRST_NAMES_M : FIRST_NAMES_F
-    const name = `${random(firstNames)} ${random(LAST_NAMES)}`
-    const college = random(COLLEGES)
-    const enrollmentYear = Math.floor(Math.random() * 5) + 2022
-    const years = ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5+']
-    const yearIndex = Math.min(2026 - enrollmentYear, years.length - 1)
-
-    students.push({
-      id: `UR/${enrollmentYear}/${college.code}/${pad(id)}`,
-      name,
-      email: generateEmail(name),
-      phone: generatePhone(),
-      gender,
-      dob: generateDOB(enrollmentYear - 18 - Math.floor(Math.random() * 4)),
-      college: college.name,
-      program: random(college.programs),
-      year: years[Math.max(0, yearIndex)],
-      enrollmentYear,
-      status: enrollmentYear < 2024 && Math.random() > 0.7 ? 'graduated' as const : 'active' as const,
-    })
-    id++
-  }
-  return students
-}
 
 // ───── Meeting slots ─────
 
 export function generateMeetingSlots(): MeetingSlot[] {
   const slots: MeetingSlot[] = []
-  const dates = ['2026-06-08', '2026-06-09', '2026-06-10', '2026-06-11', '2026-06-12', '2026-06-15', '2026-06-16', '2026-06-17', '2026-06-18', '2026-06-19']
+  const dates: string[] = []
+  const nextDate = new Date()
+  nextDate.setHours(12, 0, 0, 0)
+  while (dates.length < 10) {
+    const day = nextDate.getDay()
+    if (day !== 0 && day !== 6) dates.push(nextDate.toISOString().slice(0, 10))
+    nextDate.setDate(nextDate.getDate() + 1)
+  }
   const times = ['09:00', '10:00', '11:00', '14:00', '15:00']
   let slotId = 1
 

@@ -36,14 +36,35 @@
 
 html {
   scroll-behavior: smooth;
+  font-size: 17px;
 }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1rem;
   color: var(--gray-800);
   background: var(--gray-50);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+.main-content :is(p, li, label, input, textarea, select, button, small, dt, dd) {
+  font-size: max(0.9rem, 1em);
+}
+
+.main-content [class*="eyebrow"],
+.main-content [class*="label"],
+.main-content [class*="meta"],
+.main-content [class*="tag"],
+.main-content [class*="badge"],
+.main-content [class*="status"],
+.navbar__logo-sub {
+  font-size: max(0.85rem, 1em);
+}
+
+.navbar :is(a, button),
+.footer :is(a, p) {
+  font-size: max(0.9rem, 1em);
 }
 
 a {

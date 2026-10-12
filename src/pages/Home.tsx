@@ -1,33 +1,39 @@
+import { Link } from 'react-router-dom'
+import { useApp } from '../context/AppContext'
 import Hero from '../components/Hero'
 import Features from '../components/Features'
 import About from '../components/About'
 import Contact from '../components/Contact'
+import './Home.css'
 
 const workflowSteps = [
-  { number: '01', title: 'Create your student profile', desc: 'Register with your university identity and complete your academic details in a few clicks.' },
-  { number: '02', title: 'Upload required documents', desc: 'Submit transcripts, ID copies, and supporting records for digital verification.' },
-  { number: '03', title: 'Approval pipeline', desc: 'Each leader reviews the request in sequence until the final issuance is approved.' },
-  { number: '04', title: 'Receive certificate or transcript', desc: 'Track progress in real time and access your official documents when the request is ready.' },
+  { number: '01', title: 'Create your account', desc: 'Register once, confirm your email, and sign in whenever you return.' },
+  { number: '02', title: 'Choose a service', desc: 'Start a clearance or transcript request from your student dashboard.' },
+  { number: '03', title: 'Upload supporting files', desc: 'Submit required documents securely through your portal account.' },
+  { number: '04', title: 'Follow each next step', desc: 'Return to your account to see saved request progress and updates.' },
 ]
 
 const trustStats = [
-  'Role-based access for students and leaders',
-  'Automatic audit trail and activity history',
-  'Paperless processing across all colleges',
-  'Responsive system optimized for daily use',
+  'Separate student and reviewer workspaces',
+  'Request status and review milestones',
+  'Clearance and transcript services in one portal',
+  'Responsive interface for desktop and mobile',
 ]
 
 export default function Home() {
+  const { user } = useApp()
+  const serviceDestination = user ? (user.role === 'leader' ? '/leader' : '/dashboard') : '/signup'
+
   return (
-    <main>
+    <div className="home-page">
       <Hero />
 
       <section className="section" style={{ background: '#f8fafc' }}>
         <div className="container">
           <div style={{ textAlign: 'center', marginBottom: '48px' }}>
             <p style={{ fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.12em', fontSize: '0.75rem', marginBottom: '12px' }}>How it works</p>
-            <h2 className="section-title" style={{ marginBottom: '16px' }}>A smarter clearance journey</h2>
-            <p className="section-subtitle">From registration to official issuance, each step is designed to reduce delays, improve transparency, and create a smoother student experience.</p>
+            <h2 className="section-title" style={{ marginBottom: '16px' }}>A clear request journey</h2>
+            <p className="section-subtitle">Explore how the portal preview organizes service requests and review progress. Official records and decisions remain with the University.</p>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
@@ -47,11 +53,11 @@ export default function Home() {
 
       <section className="section" style={{ background: 'linear-gradient(180deg, #eff6ff 0%, #ffffff 100%)' }}>
         <div className="container">
-          <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '28px', alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '28px', alignItems: 'center' }}>
             <div>
-              <p style={{ fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.12em', fontSize: '0.75rem', marginBottom: '14px' }}>Why institutions choose us</p>
-              <h2 className="section-title" style={{ textAlign: 'left', marginBottom: '18px' }}>Built for institutions that need speed, accountability, and trust.</h2>
-              <p className="section-subtitle" style={{ textAlign: 'left', margin: '0 0 26px' }}>CLEAR&TRANS helps universities modernize approval workflows while keeping every step transparent for students and staff.</p>
+              <p style={{ fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.12em', fontSize: '0.75rem', marginBottom: '14px' }}>Designed for student services</p>
+              <h2 className="section-title" style={{ textAlign: 'left', marginBottom: '18px' }}>A clearer path through essential student services.</h2>
+              <p className="section-subtitle" style={{ textAlign: 'left', margin: '0 0 26px' }}>A single portal experience for requesting services, submitting supporting information, and following review progress.</p>
               <div style={{ display: 'grid', gap: '14px' }}>
                 {trustStats.map(item => (
                   <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#fff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '12px 14px' }}>
@@ -63,24 +69,19 @@ export default function Home() {
             </div>
 
             <div style={{ background: '#0f172a', color: '#fff', borderRadius: '24px', padding: '28px', boxShadow: '0 20px 45px rgba(15, 23, 42, 0.18)' }}>
-              <p style={{ color: '#93c5fd', fontWeight: 700, marginBottom: '10px' }}>Live Operations Snapshot</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
-                <div style={{ background: 'rgba(148, 163, 184, 0.12)', padding: '18px', borderRadius: '16px' }}>
-                  <div style={{ fontSize: '1.7rem', fontWeight: 800 }}>96%</div>
-                  <div style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>Student satisfaction</div>
-                </div>
-                <div style={{ background: 'rgba(59, 130, 246, 0.18)', padding: '18px', borderRadius: '16px' }}>
-                  <div style={{ fontSize: '1.7rem', fontWeight: 800 }}>24/7</div>
-                  <div style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>Access to portal</div>
-                </div>
-                <div style={{ background: 'rgba(16, 185, 129, 0.14)', padding: '18px', borderRadius: '16px' }}>
-                  <div style={{ fontSize: '1.7rem', fontWeight: 800 }}>3x</div>
-                  <div style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>Faster processing</div>
-                </div>
-                <div style={{ background: 'rgba(245, 158, 11, 0.12)', padding: '18px', borderRadius: '16px' }}>
-                  <div style={{ fontSize: '1.7rem', fontWeight: 800 }}>100%</div>
-                  <div style={{ color: '#cbd5e1', fontSize: '0.8rem' }}>Digital trail</div>
-                </div>
+              <p style={{ color: '#93c5fd', fontWeight: 700, marginBottom: '8px' }}>PORTAL AT A GLANCE</p>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '10px' }}>Two services. One clear journey.</h3>
+              <p style={{ color: '#cbd5e1', lineHeight: 1.7, marginBottom: '22px' }}>
+                Start a request, provide the information it needs, and return to your dashboard to see its current stage.
+              </p>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {['Academic clearance', 'Academic transcript'].map((service, index) => (
+                  <Link key={service} to={serviceDestination} className="home-page__service-link">
+                    <span style={{ color: index === 0 ? '#5eead4' : '#93c5fd', fontWeight: 800 }}>{index === 0 ? '01' : '02'}</span>
+                    <span style={{ fontWeight: 650 }}>{service}</span>
+                    <span aria-hidden="true" style={{ marginLeft: 'auto', color: '#94a3b8' }}>→</span>
+                  </Link>
+                ))}
               </div>
             </div>
           </div>
@@ -88,6 +89,9 @@ export default function Home() {
       </section>
 
       <Contact />
-    </main>
+      <p style={{ background: '#f1f5f9', color: '#475569', padding: '14px 24px', textAlign: 'center', fontSize: '0.8rem' }}>
+        Portal preview: connect approved University of Rwanda identity, student-record, and service systems before official deployment.
+      </p>
+    </div>
   )
 }

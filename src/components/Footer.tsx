@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import './Footer.css'
 
 export default function Footer() {
@@ -11,31 +12,27 @@ export default function Footer() {
               <span className="footer__logo">CLEAR&TRANS</span>
             </div>
             <p className="footer__desc">
-              The modern digital clearance and transcript management system for
-              educational institutions worldwide.
+              A student-services portal preview for clearance and transcript requests.
             </p>
           </div>
           <div className="footer__col">
-            <h4>Product</h4>
-            <a href="#features">Features</a>
-            <a href="#">Pricing</a>
-            <a href="#">Demo</a>
+            <h2>Portal</h2>
+            <Link to="/login">Sign in</Link>
+            <Link to="/signup">Create account</Link>
+            <Link to="/#features">Services</Link>
           </div>
           <div className="footer__col">
-            <h4>Company</h4>
-            <a href="#about">About</a>
-            <a href="#">Blog</a>
-            <a href="#contact">Contact</a>
+            <h2>Information</h2>
+            <Link to="/#about">How it works</Link>
+            <Link to="/#contact">Help &amp; access</Link>
           </div>
-          <div className="footer__col">
-            <h4>Support</h4>
-            <a href="#">Documentation</a>
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
+          <div className="footer__col footer__notice">
+            <h2>Preview notice</h2>
+            <p>This portal preview is not connected to official student records. The support contact in Help &amp; access is portal support, not a University department.</p>
           </div>
         </div>
         <div className="footer__bottom">
-          <p>&copy; {new Date().getFullYear()} CLEAR&TRANS. All rights reserved.</p>
+          <p>CLEAR&amp;TRANS student-services portal · {new Date().getFullYear()}</p>
         </div>
       </div>
     </footer>

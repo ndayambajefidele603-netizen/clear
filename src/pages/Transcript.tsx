@@ -7,12 +7,14 @@ import './Transcript.css'
 const DOC_TYPES = ['Academic Transcript', 'Certificate of Completion', 'Detailed Score Sheet', 'Degree Certificate']
 
 export default function Transcript() {
-  const { user, requests, uploadDoc, addUpdate } = useApp()
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'docs' | 'chat' | 'request'>('pipeline')
+  const { user, requests, uploadDoc, submitRequest } = useApp()
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'docs' | 'chat' | 'request'>('docs')
   const [selectedType, setSelectedType] = useState(DOC_TYPES[0])
   const [copies, setCopies] = useState(1)
   const [submitted, setSubmitted] = useState(false)
   const [showCert, setShowCert] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   if (!user || user.role !== 'student') return null
 
@@ -27,18 +29,31 @@ export default function Transcript() {
 
   const currentLeaderInfo = UR_HIERARCHY.find(l => l.level === request.currentLevel) || UR_HIERARCHY[0]
 
+  const handleSubmitRequest = async () => {
+    setSubmitting(true)
+    setSubmitError('')
+    const error = await submitRequest(request.id)
+    setSubmitting(false)
+    if (error) setSubmitError(error)
+    else setSubmitted(true)
+  }
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitted(true)
-    addUpdate(`Transcript request submitted: ${selectedType} × ${copies}`, 'info')
+    void handleSubmitRequest()
   }
 
   const handleUpload = (docId: string) => {
     const input = document.createElement('input')
     input.type = 'file'
+    input.accept = 'application/pdf,image/jpeg,image/png,image/webp,image/gif'
     input.onchange = () => {
       const file = input.files?.[0]
-      if (file) uploadDoc(request.id, docId, file.name)
+      if (file) void uploadDoc(request.id, docId, file).then(error => {
+        if (error) window.alert(error)
+      }).catch(error => {
+        console.error('Failed to save transcript attachment', error)
+        window.alert('Could not upload the file. Please check your connection and try again.')
+      })
     }
     input.click()
   }
@@ -64,7 +79,7 @@ export default function Transcript() {
                 onClick={() => setShowCert(true)}
                 style={{ background: '#10b981', color: '#fff', padding: '6px 14px', borderRadius: '20px', fontWeight: '700', fontSize: '0.85rem' }}
               >
-                📊 View Official Transcript & Certificate
+                View completed request summary
               </button>
             )}
           </div>
@@ -74,7 +89,7 @@ export default function Transcript() {
           <button className={`transcript__tab ${activeTab === 'request' ? 'transcript__tab--active' : ''}`} onClick={() => setActiveTab('request')}>New Request</button>
           <button className={`transcript__tab ${activeTab === 'pipeline' ? 'transcript__tab--active' : ''}`} onClick={() => setActiveTab('pipeline')}>Approval Pipeline</button>
           <button className={`transcript__tab ${activeTab === 'docs' ? 'transcript__tab--active' : ''}`} onClick={() => setActiveTab('docs')}>Documents</button>
-          <button className={`transcript__tab ${activeTab === 'chat' ? 'transcript__tab--active' : ''}`} onClick={() => setActiveTab('chat')}>AI Assistant</button>
+          <button className={`transcript__tab ${activeTab === 'chat' ? 'transcript__tab--active' : ''}`} onClick={() => setActiveTab('chat')}>Help &amp; guidance</button>
         </div>
 
         {activeTab === 'request' && (
@@ -159,14 +174,14 @@ export default function Transcript() {
                       {step?.comment && <div className="transcript__level-comment"><strong>Comment:</strong> {step.comment}</div>}
                       {step?.signature && (
                         <div className="transcript__level-sig">
-                          ✍️ Signed: <span className="transcript__sig-text">{step.signature}</span>
+                          Recorded e-signature (preview): <span className="transcript__sig-text">{step.signature}</span>
                         </div>
                       )}
                       {step?.date && <div className="transcript__level-date">{step.date}</div>}
                       {isActive && (
                         <div className="transcript__level-action">
                           <p className="transcript__level-hint">Currently with <strong>{leader.name}</strong> ({leader.title})</p>
-                          <button className="transcript__btn" onClick={() => setActiveTab('chat')}>Ask AI Assistant →</button>
+                          <button className="transcript__btn" onClick={() => setActiveTab('chat')}>Get portal guidance →</button>
                         </div>
                       )}
                     </div>
@@ -181,7 +196,7 @@ export default function Transcript() {
           <div className="transcript__docs">
             <div className="transcript__docs-header">
               <h2>Required Documents</h2>
-              <p>Upload these documents for your transcript request</p>
+              <p>Upload each item to your secure portal account. You can sign in again later to continue.</p>
             </div>
             <div className="transcript__docs-grid">
               {request.docs.map(doc => (
@@ -194,17 +209,33 @@ export default function Transcript() {
                   </div>
                   <div className="transcript__doc-actions">
                     <span className={`transcript__doc-status ${doc.verified ? 'transcript__doc-status--ok' : doc.uploaded ? 'transcript__doc-status--pending' : 'transcript__doc-status--missing'}`}>
-                      {doc.verified ? 'Verified' : doc.uploaded ? 'Pending Review' : 'Not Uploaded'}
+                      {doc.verified ? 'Reviewed' : doc.reviewStatus === 'correction_requested' ? 'Correction requested' : doc.uploaded ? 'Uploaded to portal' : 'Not selected'}
                     </span>
                     {!doc.verified && (
                       <button className="transcript__doc-upload" onClick={() => handleUpload(doc.id)}>
-                        {doc.uploaded ? 'Re-upload' : 'Upload'}
+                        {doc.uploaded ? 'Select again' : 'Select file'}
                       </button>
                     )}
                   </div>
                 </div>
               ))}
             </div>
+            {request.status === 'draft' && (
+              <div className="transcript__submit-panel">
+                <div>
+                  <strong>{request.docs.filter(doc => !doc.uploaded).length ? `${request.docs.filter(doc => !doc.uploaded).length} documents remaining` : 'Your checklist is complete'}</strong>
+                  <p>{request.docs.some(doc => !doc.uploaded) ? 'Add every required document before sending your request for review.' : 'Your documents are saved to your portal account and ready to submit.'}</p>
+                </div>
+                <button
+                  className="transcript__btn"
+                  disabled={request.docs.some(doc => !doc.uploaded) || submitting}
+                  onClick={() => void handleSubmitRequest()}
+                >
+                  {submitting ? 'Submitting…' : 'Submit transcript request'}
+                </button>
+                {submitError && <p className="transcript__submit-error" role="alert">{submitError}</p>}
+              </div>
+            )}
           </div>
         )}
 

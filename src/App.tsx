@@ -7,18 +7,21 @@ import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import Clearance from './pages/Clearance'
 import Transcript from './pages/Transcript'
+import Documents from './pages/Documents'
 import LeaderDashboard from './pages/LeaderDashboard'
 import Notifications from './components/Notifications'
 import { AppProvider, useApp } from './context/AppContext'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useApp()
+  const { user, sessionReady } = useApp()
+  if (!sessionReady) return <div className="auth-session-loading" role="status">Restoring your secure portal session…</div>
   if (!user) return <Navigate to="/login" replace />
   return <>{children}</>
 }
 
 function LeaderRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useApp()
+  const { user, sessionReady } = useApp()
+  if (!sessionReady) return <div className="auth-session-loading" role="status">Restoring your secure portal session…</div>
   if (!user) return <Navigate to="/login" replace />
   if (user.role !== 'leader') return <Navigate to="/dashboard" replace />
   return <>{children}</>
@@ -34,6 +37,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/clearance" element={<ProtectedRoute><Clearance /></ProtectedRoute>} />
         <Route path="/transcript" element={<ProtectedRoute><Transcript /></ProtectedRoute>} />
+        <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
         <Route path="/leader" element={<LeaderRoute><LeaderDashboard /></LeaderRoute>} />
       </Routes>
     </main>

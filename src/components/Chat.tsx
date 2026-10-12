@@ -22,30 +22,30 @@ function getAIResponse(input: string, request?: StudentRequest): string {
   const type = request?.type || 'clearance'
 
   if (lower.includes('pay') || lower.includes('fee') || lower.includes('frw') || lower.includes('cost') || lower.includes('irembo') || lower.includes('momo')) {
-    return `💳 **Payment Instructions for UR Processing Fee:**\n• Clearance certificate processing is **FREE** for graduating students.\n• Transcript requests cost **FRW 5,000 per copy**.\n• Payment methods: MTN MoMo Pay (\`*182*8*1*CODE#\`), BK Yacu, or Irembo Portal (\`www.irembo.gov.rw\`).\n• Make sure to upload your payment receipt under the Documents tab!`
+    return '💳 This preview does not confirm University fees or accept payments. Before paying, check the current amount and approved payment method with the relevant University finance or registrar office. Do not rely on payment details from this preview.'
   }
 
   if (lower.includes('office') || lower.includes('location') || lower.includes('where') || lower.includes('room') || lower.includes('meet')) {
-    return `🏛️ **Leader Office Locations & Hours:**\n• **Class Rep (${UR_HIERARCHY[0].name}):** ${UR_HIERARCHY[0].office} (${UR_HIERARCHY[0].officeHours})\n• **Head of Dept (${UR_HIERARCHY[1].name}):** ${UR_HIERARCHY[1].office} (${UR_HIERARCHY[1].officeHours})\n• **College Principal (${UR_HIERARCHY[2].name}):** ${UR_HIERARCHY[2].office} (${UR_HIERARCHY[2].officeHours})\n• **Registrar (${UR_HIERARCHY[3].name}):** ${UR_HIERARCHY[3].office} (${UR_HIERARCHY[3].officeHours})`
+    return '🏛️ Office locations and hours shown in this preview are not verified against University directories. Confirm appointments and contact details with your college or the official University website.'
   }
 
   if (lower.includes('status') || lower.includes('progress') || lower.includes('level') || lower.includes('track')) {
-    return `📊 **Current Clearance Status for ${request?.id || 'Request'}:**\n• Current Review Level: **Level ${level} of 4** (${leaderInfo?.title} — ${leader})\n• Documents Uploaded: **${uploaded}/${total}**\n• Documents Verified: **${verified}/${total}**\n${request?.status === 'completed' ? '🎉 **Congratulations! Your clearance is fully approved. You can view/print your official certificate now.**' : 'Waiting for leader verification and electronic signature.'}`
+    return `📊 **Portal preview status for ${request?.id || 'Request'}:**\n• Current review stage: **Level ${level} of 4** (${leaderInfo?.title} — ${leader})\n• Files selected in this session: **${uploaded}/${total}**\n• Files marked reviewed: **${verified}/${total}**\n${request?.status === 'completed' ? 'This request is marked complete in the preview. This is not an official University decision or issued document.' : 'This progress is stored by the local portal preview and is not checked against University systems.'}`
   }
 
   if (lower.includes('document') || lower.includes('upload') || lower.includes('file') || lower.includes('paper') || lower.includes('slip')) {
-    return `📁 **Required Documents for Clearance:**\n1. **Student ID Card** (Photo ID copy)\n2. **Fee Clearance Statement** (Zero balance proof from Bursar)\n3. **Library Clearance Slip** (Books return confirmation)\n4. **Final Year Project Report** (Approved dissertation signoff)\n5. **Hostel Clearance Form** (Vacate confirmation)\n\nUploaded: **${uploaded}/${total}** | Verified: **${verified}/${total}**`
+    return `📁 The checklist shown on the ${type} request is a preview template. Confirm the current requirements with your college before submitting records. Selected files are stored only in this browser on this device.\n\nFiles selected in this session: **${uploaded}/${total}** | Marked reviewed: **${verified}/${total}**`
   }
 
   if (lower.includes('time') || lower.includes('long') || lower.includes('day') || lower.includes('when') || lower.includes('how long')) {
-    return `⏱️ **Processing Timeline:**\n• Level 1 (Class Rep): 1–2 business days\n• Level 2 (Head of Department): 2–3 business days\n• Level 3 (College Principal): 2–3 business days\n• Level 4 (Registrar): 1–2 business days\n• **Total Estimated Time:** 5 to 10 business days.`
+    return '⏱️ Processing times depend on the service and University office. This preview has no live service-level information; please confirm expected timing with the relevant office.'
   }
 
   if (lower.includes('reject') || lower.includes('fail') || lower.includes('denied') || lower.includes('problem')) {
-    return `❌ **Handling Rejections:**\nIf a leader rejects your clearance or a document:\n1. Check the comment left in your **Approval Pipeline** tab.\n2. Re-upload corrected documents under the **Documents** tab.\n3. Book an office meeting or contact the leader during office hours.`
+    return '❌ Check the review comment in the request and contact your college for official guidance. This preview does not send notifications to University staff.'
   }
 
-  return `🤖 I am the **CLEAR&TRANS AI Assistant**. I can help you with:\n• Tracking your ${type} request progress\n• Understanding required document uploads\n• Finding leader office hours & booking appointments\n• Payment & fee guidelines\n\nHow can I help you today?`
+  return `Portal guidance can show locally saved ${type} request progress and the preview checklist. For official requirements, fees, appointments, or records, contact the relevant University office.`
 }
 
 export default function Chat({ request, compact, leaderName, leaderTitle }: {
@@ -55,7 +55,7 @@ export default function Chat({ request, compact, leaderName, leaderTitle }: {
   leaderTitle?: string
 }) {
   const [messages, setMessages] = useState<Array<{ text: string; from: 'user' | 'ai' }>>([
-    { text: `Hello! I'm your CLEAR&TRANS AI Assistant. I can help you track your ${request?.type || 'clearance'} request, find leader office hours, and check document requirements.`, from: 'ai' },
+    { text: `Hello! I can help you navigate the portal preview and check your locally saved ${request?.type || 'clearance'} request status. I cannot access University records or confirm official requirements.`, from: 'ai' },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -96,8 +96,8 @@ export default function Chat({ request, compact, leaderName, leaderTitle }: {
           <div className="chat__header-info">
             <div className="chat__avatar chat__avatar--ai">AI</div>
             <div>
-              <h3 className="chat__leader-name">CLEAR&TRANS Assistant</h3>
-              <p className="chat__leader-title">University of Rwanda Support · Request {request?.id}</p>
+              <h3 className="chat__leader-name">Portal guidance</h3>
+              <p className="chat__leader-title">Preview help · Request {request?.id}</p>
             </div>
           </div>
           {displayLeader && (
@@ -150,7 +150,7 @@ export default function Chat({ request, compact, leaderName, leaderTitle }: {
       <form className="chat__input" onSubmit={handleSend}>
         <input
           type="text"
-          placeholder="Ask AI about status, fees, office locations..."
+          placeholder="Ask about your request or portal steps..."
           value={input}
           onChange={e => setInput(e.target.value)}
           className="chat__input-field"

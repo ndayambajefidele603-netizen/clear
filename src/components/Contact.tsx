@@ -1,83 +1,61 @@
-import { type FormEvent, useState } from 'react'
-import { useReveal } from '../hooks/useReveal'
+import { Link } from 'react-router-dom'
 import './Contact.css'
 
+const supportRoutes = [
+  {
+    label: 'FOR STUDENTS',
+    title: 'Request a service',
+    description: 'Sign in to start or continue a clearance or transcript request.',
+    link: '/login',
+    linkText: 'Student sign in',
+  },
+  {
+    label: 'FOR REVIEWERS',
+    title: 'Preview review workspace',
+    description: 'Explore the local reviewer interface. Staff access is not connected to University identity systems.',
+    link: '/login',
+    linkText: 'Staff sign in',
+  },
+  {
+    label: 'PORTAL SUPPORT',
+    title: 'Contact the support team',
+    description: 'For help using this portal preview, contact the support contact supplied by the portal owner. This is not an official University department contact.',
+    phone: '+250 786 817 364',
+    email: 'ndayambajefidele603@gmail.com',
+  },
+]
+
 export default function Contact() {
-  const [submitted, setSubmitted] = useState(false)
-  const { ref, visible } = useReveal()
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    setSubmitted(true)
-  }
-
   return (
-    <section id="contact" className="contact section" ref={ref}>
+    <section id="contact" className="contact section" aria-labelledby="contact-title">
       <div className="container">
-        <div className="contact__header" style={{
-          opacity: visible ? 1 : 0,
-          transform: visible ? 'translateY(0)' : 'translateY(30px)',
-          transition: 'all 0.6s ease',
-        }}>
-          <h2 className="section-title">Get In Touch</h2>
+        <div className="contact__header">
+          <span className="contact__eyebrow">HELP &amp; ACCESS</span>
+          <h2 id="contact-title" className="section-title">How can we help?</h2>
           <p className="section-subtitle">
-            Ready to digitize your institution's clearance and transcript processes?
-            Let's talk.
+            Choose the right entry point for your role. For official University policies
+            or document requirements, follow guidance from your institution.
           </p>
         </div>
         <div className="contact__inner">
-          <div className="contact__info" style={{
-            opacity: visible ? 1 : 0,
-            transform: visible ? 'translateX(0)' : 'translateX(-30px)',
-            transition: 'all 0.6s ease 0.2s',
-          }}>
-            <div className="contact__item">
-              <span className="contact__item-icon">📧</span>
-              <div>
-                <strong>Email</strong>
-                <p>support@clear&trans.ur.ac.rw</p>
-              </div>
-            </div>
-            <div className="contact__item">
-              <span className="contact__item-icon">📞</span>
-              <div>
-                <strong>Phone</strong>
-                <p>+250 788 555 000</p>
-              </div>
-            </div>
-            <div className="contact__item">
-              <span className="contact__item-icon">📍</span>
-              <div>
-                <strong>Address</strong>
-                <p>University of Rwanda<br />Kigali, Rwanda</p>
-              </div>
-            </div>
-          </div>
-          <form className="contact__form hover-glow" onSubmit={handleSubmit} style={{
-            opacity: visible ? 1 : 0,
-            transform: visible ? 'translateX(0)' : 'translateX(30px)',
-            transition: 'all 0.6s ease 0.3s',
-          }}>
-            {submitted ? (
-              <div className="contact__success">
-                <span className="contact__success-icon">✓</span>
-                <h3>Message Sent!</h3>
-                <p>We'll get back to you within 24 hours.</p>
-              </div>
-            ) : (
-              <>
-                <div className="contact__fields">
-                  <input type="text" placeholder="Full Name" required className="contact__input" />
-                  <input type="email" placeholder="Email Address" required className="contact__input" />
+          {supportRoutes.map(item => (
+            <article className="contact__card" key={item.label}>
+              <span className="contact__card-label">{item.label}</span>
+              <h3>{item.title}</h3>
+              <p>{item.description}</p>
+              {item.phone && item.email && (
+                <div className="contact__support-links" aria-label="Portal support contact details">
+                  <a className="contact__card-link" href={`tel:${item.phone.replace(/\s/g, '')}`}>Call {item.phone}</a>
+                  <a className="contact__card-link" href={`mailto:${item.email}`}>Email {item.email}</a>
                 </div>
-                <input type="text" placeholder="Institution Name" required className="contact__input" />
-                <textarea placeholder="Tell us about your needs..." rows={5} required className="contact__textarea" />
-                <button type="submit" className="contact__submit">
-                  Send Message →
-                </button>
-              </>
-            )}
-          </form>
+              )}
+              {item.link && item.linkText && (
+                <Link to={item.link} className="contact__card-link">
+                  {item.linkText} <span aria-hidden="true">→</span>
+                </Link>
+              )}
+            </article>
+          ))}
         </div>
       </div>
     </section>

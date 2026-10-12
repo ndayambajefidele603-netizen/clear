@@ -1,5 +1,6 @@
 .contact {
   background: #fff;
+  overflow-x: clip;
 }
 
 .contact__header {
@@ -8,39 +9,80 @@
 
 .contact__inner {
   display: grid;
-  grid-template-columns: 1fr 1.5fr;
-  gap: 64px;
-  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 18px;
+  align-items: stretch;
 }
 
-.contact__info {
+.contact__eyebrow,
+.contact__card-label {
+  display: block;
+  color: var(--primary-dark);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.contact__header {
+  margin-bottom: 34px;
+}
+
+.contact__inner .contact__card {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-}
-
-.contact__item {
-  display: flex;
   align-items: flex-start;
-  gap: 16px;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--gray-200);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.045);
 }
 
-.contact__item-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.contact__item strong {
-  display: block;
-  font-size: 0.95rem;
+.contact__card h3 {
+  margin: 10px 0 8px;
   color: var(--secondary);
-  margin-bottom: 4px;
+  font-size: 1.05rem;
 }
 
-.contact__item p {
-  font-size: 0.9rem;
+.contact__card p {
+  flex: 1;
   color: var(--gray-500);
-  line-height: 1.5;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+
+.contact__card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  color: var(--primary-dark);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.contact__card-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.contact__card-link:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.contact__support-links {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.contact__support-links .contact__card-link {
+  overflow-wrap: anywhere;
+  margin-top: 0;
 }
 
 .contact__form {
@@ -124,15 +166,6 @@
 
 @media (max-width: 768px) {
   .contact__inner {
-    grid-template-columns: 1fr;
-    gap: 40px;
-  }
-
-  .contact__fields {
-    grid-template-columns: 1fr;
-  }
-
-  .contact__form {
-    padding: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
   }
 }

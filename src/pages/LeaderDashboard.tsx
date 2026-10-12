@@ -3,8 +3,41 @@ import { useApp, LEADERS, COLLEGES, type RequestDocument, type StudentRecord } f
 import DocPreviewModal from '../components/DocPreviewModal'
 import './LeaderDashboard.css'
 
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+async function sendFinalApprovalEmail(payload: {
+  email: string
+  studentName: string
+  requestId: string
+  requestType: string
+  leaderName: string
+  signature: string
+  comment: string
+}) {
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE}/api/notifications/final-approval`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  } catch {
+    throw new Error('Could not reach the email service. Check that the backend is running, then try again.')
+  }
+
+  let result: { error?: string; message?: string }
+  try {
+    result = await response.json() as { error?: string; message?: string }
+  } catch {
+    throw new Error('The email service returned an invalid response. Please try again later.')
+  }
+  if (!response.ok) {
+    throw new Error(result.error || `Email delivery failed (status ${response.status}).`)
+  }
+}
+
 export default function LeaderDashboard() {
-  const { user, verifyDoc, approveAllDocs, approveRequest, rejectRequest, meetingSlots, cancelMeeting, allStudents, getStudentRequests, loginLeader } = useApp()
+  const { user, verifyDoc, approveRequest, rejectRequest, meetingSlots, cancelMeeting, allStudents, getStudentRequests, getDocumentPreviewUrl, hasDocumentPreviewUrl } = useApp()
   const [tab, setTab] = useState<'pending' | 'students' | 'meetings' | 'history'>('pending')
   const [requestTypeFilter, setRequestTypeFilter] = useState<'all' | 'clearance' | 'transcript'>('all')
   const [selectedItemKey, setSelectedItemKey] = useState<string | null>(null)
@@ -12,6 +45,9 @@ export default function LeaderDashboard() {
   const [sigModal, setSigModal] = useState<{ studentEmail: string; requestId: string; requestType: string; action: 'approve' | 'reject' } | null>(null)
   const [signature, setSignature] = useState('')
   const [previewDocModal, setPreviewDocModal] = useState<{ doc: RequestDocument; student: StudentRecord; requestId: string } | null>(null)
+  const [finalEmailSending, setFinalEmailSending] = useState(false)
+  const [finalEmailError, setFinalEmailError] = useState('')
+  const [finalEmailNotice, setFinalEmailNotice] = useState('')
 
   // Database search & filter state
   const [searchTerm, setSearchTerm] = useState('')
@@ -45,20 +81,44 @@ export default function LeaderDashboard() {
     verifyDoc(studentEmail, requestId, docId, approved, leader.name)
   }
 
-  const handleApproveAll = (studentEmail: string, requestId: string) => {
-    approveAllDocs(studentEmail, requestId, leader.name)
-  }
-
   const openSignatureModal = (studentEmail: string, requestId: string, requestType: string, action: 'approve' | 'reject') => {
     setSignature(leader.name)
+    setFinalEmailError('')
     setSigModal({ studentEmail, requestId, requestType, action })
   }
 
-  const confirmSignature = () => {
+  const confirmSignature = async () => {
     if (!sigModal || !signature.trim()) return
     const { studentEmail, requestId, action } = sigModal
 
     if (action === 'approve') {
+      if (leader.level === LEADERS.length) {
+        const student = allStudents.find(record => record.email.toLowerCase() === studentEmail.toLowerCase())
+        const request = getStudentRequests(studentEmail).find(record => record.id === requestId)
+        if (!student || !request || request.status !== 'in_progress' || request.currentLevel !== leader.level) {
+          setFinalEmailError('Could not verify this student request. It was not completed.')
+          return
+        }
+        setFinalEmailSending(true)
+        setFinalEmailError('')
+        try {
+          await sendFinalApprovalEmail({
+            email: student.email,
+            studentName: student.name,
+            requestId,
+            requestType: sigModal.requestType,
+            leaderName: leader.name,
+            signature: signature.trim(),
+            comment: comment.trim() || 'Approved — all required documents verified and approved.',
+          })
+          setFinalEmailNotice(`Final approval email sent to ${student.email}.`)
+        } catch (error) {
+          setFinalEmailError(error instanceof Error ? error.message : 'Could not send the final approval email.')
+          setFinalEmailSending(false)
+          return
+        }
+        setFinalEmailSending(false)
+      }
       approveRequest(studentEmail, requestId, comment || 'Approved — all required documents verified and approved.', leader.name, signature.trim())
     } else {
       rejectRequest(studentEmail, requestId, comment || 'Requirements not met.', leader.name, signature.trim())
@@ -70,8 +130,10 @@ export default function LeaderDashboard() {
   }
 
   const closeSigModal = () => {
+    if (finalEmailSending) return
     setSigModal(null)
     setSignature('')
+    setFinalEmailError('')
   }
 
   // Filtered students for Database tab
@@ -87,43 +149,7 @@ export default function LeaderDashboard() {
   return (
     <section className="ldash">
       <div className="container">
-        {/* Quick Leader Switcher Toolbar */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          flexWrap: 'wrap',
-          background: 'rgba(15, 23, 42, 0.7)',
-          padding: '10px 16px',
-          borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          marginBottom: '1rem'
-        }}>
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>
-            Switch Active Leader (Approval Chain):
-          </span>
-          {LEADERS.map(l => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => loginLeader(l.email)}
-              style={{
-                background: l.id === leader.id ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
-                color: l.id === leader.id ? '#ffffff' : '#94a3b8',
-                border: l.id === leader.id ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '8px',
-                padding: '6px 12px',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              L{l.level}: {l.title} ({l.avatar})
-            </button>
-          ))}
-        </div>
-
+        {finalEmailNotice && <p role="status" className="ldash__bio">{finalEmailNotice}</p>}
         {/* Leader Profile Header */}
         <div className="ldash__profile">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -238,9 +264,11 @@ export default function LeaderDashboard() {
                 {pendingItems.map(({ student, request }) => {
                   const itemKey = `${student.id}_${request.id}`
                   const isOpen = selectedItemKey === itemKey
-                  const approvedDocsCount = request.docs.filter(d => d.verified).length
+                  const approvedDocsCount = request.docs.filter(d => d.verified && hasDocumentPreviewUrl(student.email, request.id, d.id)).length
                   const totalDocsCount = request.docs.length
-                  const allDocsApproved = totalDocsCount > 0 && approvedDocsCount === totalDocsCount
+                  const allDocsApproved = totalDocsCount > 0 && request.docs.every(doc =>
+                    doc.uploaded && doc.verified && hasDocumentPreviewUrl(student.email, request.id, doc.id)
+                  )
 
                   return (
                     <div key={itemKey} className={`ldash__student-card ${isOpen ? 'ldash__student-card--open' : ''}`}>
@@ -269,49 +297,32 @@ export default function LeaderDashboard() {
                             <p><strong>Email:</strong> {student.email}</p>
                             <p><strong>Phone:</strong> {student.phone}</p>
                             <p><strong>College:</strong> {student.college}</p>
-                            <p><strong>Enrolled:</strong> {student.enrollmentYear}</p>
-                            <p><strong>Status:</strong> {student.status}</p>
+                            <p><strong>Enrollment year:</strong> {student.enrollmentYear ?? 'Not linked to University records'}</p>
+                            <p><strong>Status:</strong> {student.status ?? 'Not linked to University records'}</p>
                           </div>
 
                           <div className="ldash__student-docs">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                              <h4>Verify Required Documents ({approvedDocsCount}/{totalDocsCount} Approved)</h4>
-                              <button
-                                type="button"
-                                className="ldash__btn ldash__btn--sm ldash__btn--ok"
-                                onClick={() => handleApproveAll(student.email, request.id)}
-                                style={{ fontWeight: 600, fontSize: '0.8rem' }}
-                              >
-                                ✓ Approve All Documents
-                              </button>
+                              <h4>Review Required Documents ({approvedDocsCount}/{totalDocsCount} Reviewed)</h4>
                             </div>
+                            <p className="ldash__section-desc">Open each attachment to inspect its contents before recording a review. Files need to be selected again after a page reload.</p>
 
                             {request.docs.map(doc => (
                               <div key={doc.id} className="ldash__doc-row">
                                 <div className="ldash__doc-name-col">
                                   <strong>{doc.name}</strong>
                                   <span className={`ldash__doc-tag ${doc.verified ? 'ldash__doc-tag--ok' : doc.uploaded ? 'ldash__doc-tag--pending' : 'ldash__doc-tag--none'}`}>
-                                    {doc.verified ? '✓ Approved' : doc.uploaded ? 'Uploaded' : 'Missing'}
+                                    {doc.verified ? '✓ Reviewed' : doc.reviewStatus === 'correction_requested' ? 'Correction requested' : hasDocumentPreviewUrl(student.email, request.id, doc.id) ? 'Ready to review' : doc.uploaded ? 'Open to load saved file' : 'Missing'}
                                   </span>
                                 </div>
                                 <div className="ldash__doc-btn-group">
                                   <button
                                     className="ldash__btn ldash__btn--sm ldash__btn--info"
+                                    disabled={!doc.uploaded}
+                                    title={!doc.uploaded ? 'The student must select this file before it can be reviewed.' : 'Open the saved attachment'}
                                     onClick={() => setPreviewDocModal({ doc, student, requestId: request.id })}
                                   >
-                                    👁️ Preview
-                                  </button>
-                                  <button
-                                    className="ldash__btn ldash__btn--sm ldash__btn--ok"
-                                    onClick={() => handleVerify(student.email, request.id, doc.id, true)}
-                                  >
-                                    ✓ Approve
-                                  </button>
-                                  <button
-                                    className="ldash__btn ldash__btn--sm ldash__btn--danger"
-                                    onClick={() => handleVerify(student.email, request.id, doc.id, false)}
-                                  >
-                                    ✗ Reject
+                                    👁️ {doc.uploaded ? 'Review file' : 'No file selected'}
                                   </button>
                                 </div>
                               </div>
@@ -331,7 +342,7 @@ export default function LeaderDashboard() {
                                 fontSize: '0.85rem',
                                 marginBottom: '10px'
                               }}>
-                                ⚠️ <strong>Document Verification Enforced:</strong> Every document must be approved by {leader.name} before this request can be signed and forwarded to {leader.level === 4 ? 'issue the final certificate' : `Level ${leader.level + 1}`}.
+                                ⚠️ <strong>Document review required:</strong> Review every selected attachment before recording a decision in this portal preview.
                               </div>
                             )}
 
@@ -345,13 +356,13 @@ export default function LeaderDashboard() {
                                 fontSize: '0.85rem',
                                 marginBottom: '10px'
                               }}>
-                                ✓ <strong>All documents verified:</strong> You may now sign off and forward this request.
+                                ✓ <strong>All documents reviewed:</strong> You may now record the next preview workflow decision.
                               </div>
                             )}
 
                             <textarea
                               className="ldash__comment"
-                              placeholder={`Add review comments or notes for ${leader.level === 4 ? 'final official record' : 'next leader level'}...`}
+                              placeholder={`Add review comments or notes for ${leader.level === 4 ? 'final preview decision' : 'next review stage'}...`}
                               value={comment}
                               onChange={e => setComment(e.target.value)}
                               rows={2}
@@ -364,7 +375,7 @@ export default function LeaderDashboard() {
                                 style={{ opacity: allDocsApproved ? 1 : 0.5, cursor: allDocsApproved ? 'pointer' : 'not-allowed' }}
                                 title={!allDocsApproved ? 'Approve all required documents first' : 'Sign and forward'}
                               >
-                                {leader.level === 4 ? '✓ Final Approval & Issue Certificate →' : '✓ Approve & Forward →'}
+                                {leader.level === 4 ? '✓ Complete & notify student →' : '✓ Approve & Forward →'}
                               </button>
                               <button
                                 className="ldash__btn ldash__btn--reject"
@@ -415,7 +426,7 @@ export default function LeaderDashboard() {
             </div>
 
             <div className="ldash__db-header">
-              <p>Showing {filteredStudents.length} of {allStudents.length} students registered from 2022 to 2026</p>
+              <p>Showing {filteredStudents.length} of {allStudents.length} student profiles in this preview. Live University records are not connected.</p>
               <span className="ldash__db-count">{filteredStudents.filter(s => s.status === 'active').length} Active · {filteredStudents.filter(s => s.status === 'graduated').length} Graduated</span>
             </div>
 
@@ -435,7 +446,7 @@ export default function LeaderDashboard() {
                   <span>{s.college.split('(')[1]?.replace(')', '') || s.college}</span>
                   <span>{s.program}</span>
                   <span>{s.year}</span>
-                  <span><span className={`ldash__db-status ${s.status === 'active' ? 'ldash__db-status--active' : s.status === 'graduated' ? 'ldash__db-status--grad' : 'ldash__db-status--wd'}`}>{s.status}</span></span>
+                  <span><span className={`ldash__db-status ${s.status === 'active' ? 'ldash__db-status--active' : s.status === 'graduated' ? 'ldash__db-status--grad' : 'ldash__db-status--wd'}`}>{s.status || 'Not linked'}</span></span>
                 </div>
               ))}
             </div>
@@ -520,8 +531,15 @@ export default function LeaderDashboard() {
           <div className="ldash__modal" onClick={e => e.stopPropagation()}>
             <h3 className="ldash__modal-title">Digital Signature Required</h3>
             <p className="ldash__modal-desc">
-              Type your full name as an electronic signature to {sigModal.action === 'approve' ? 'approve' : 'reject'} this request.
+              Type your full name to record your {sigModal.action === 'approve' ? 'approval' : 'rejection'} in this portal preview.
             </p>
+            {sigModal.action === 'approve' && leader.level === LEADERS.length && (
+              <p className="ldash__modal-desc">
+                This preview can send an approval notification to{' '}
+                <strong>{allStudents.find(student => student.email.toLowerCase() === sigModal.studentEmail.toLowerCase())?.email || sigModal.studentEmail}</strong>,
+                but cannot securely issue or email an official document yet.
+              </p>
+            )}
             <div className="ldash__modal-field">
               <label>E-Signature</label>
               <input
@@ -534,18 +552,24 @@ export default function LeaderDashboard() {
               />
             </div>
             <p className="ldash__sig-disclaimer">
-              By signing, you acknowledge that this constitutes a legally binding electronic signature in accordance with applicable laws.
+              This typed name is a preview sign-off record only. It is not a verified or legally binding electronic signature.
             </p>
             <div className="ldash__modal-actions">
-              <button className="ldash__btn ldash__btn--cancel" onClick={closeSigModal}>Cancel</button>
+              <button className="ldash__btn ldash__btn--cancel" onClick={closeSigModal} disabled={finalEmailSending}>Cancel</button>
               <button
                 className={`ldash__btn ${sigModal.action === 'approve' ? 'ldash__btn--approve' : 'ldash__btn--reject'}`}
-                onClick={confirmSignature}
-                disabled={!signature.trim()}
+                onClick={() => void confirmSignature()}
+                disabled={!signature.trim()
+                  || finalEmailSending}
               >
-                {sigModal.action === 'approve' ? '✓ Sign & Approve' : '✗ Sign & Reject'}
+                {finalEmailSending
+                  ? 'Sending email…'
+                  : sigModal.action === 'approve' && leader.level === LEADERS.length
+                    ? '✓ Sign, approve & notify student'
+                    : sigModal.action === 'approve' ? '✓ Sign & Approve' : '✗ Sign & Reject'}
               </button>
             </div>
+            {finalEmailError && <p role="alert" style={{ color: '#fca5a5', marginTop: '12px' }}>{finalEmailError}</p>}
           </div>
         </div>
       )}
@@ -556,6 +580,7 @@ export default function LeaderDashboard() {
           doc={previewDocModal.doc}
           studentName={previewDocModal.student.name}
           studentId={previewDocModal.student.id}
+          loadFile={() => getDocumentPreviewUrl(previewDocModal.student.email, previewDocModal.requestId, previewDocModal.doc.id)}
           isLeader={true}
           onClose={() => setPreviewDocModal(null)}
           onVerify={(approved) => handleVerify(previewDocModal.student.email, previewDocModal.requestId, previewDocModal.doc.id, approved)}

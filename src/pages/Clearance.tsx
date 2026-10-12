@@ -8,12 +8,14 @@ import DocPreviewModal from '../components/DocPreviewModal'
 import './Clearance.css'
 
 export default function Clearance() {
-  const { user, requests, uploadDoc } = useApp()
+  const { user, requests, uploadDoc, submitRequest, getDocumentPreviewUrl } = useApp()
   const [searchParams] = useSearchParams()
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'docs' | 'chat'>(searchParams.get('chat') ? 'chat' : 'pipeline')
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'docs' | 'chat'>(searchParams.get('chat') ? 'chat' : 'docs')
   const [showCert, setShowCert] = useState(false)
   const [showMeeting, setShowMeeting] = useState(false)
   const [previewDoc, setPreviewDoc] = useState<RequestDocument | null>(null)
+  const [submitError, setSubmitError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   if (!user || user.role !== 'student') return null
 
@@ -27,14 +29,29 @@ export default function Clearance() {
   )
 
   const currentLeaderInfo = UR_HIERARCHY.find(l => l.level === request.currentLevel) || UR_HIERARCHY[0]
+  const missingDocuments = request.docs.filter(doc => !doc.uploaded).length
   const handleUpload = (docId: string) => {
     const input = document.createElement('input')
     input.type = 'file'
+    input.accept = 'application/pdf,image/jpeg,image/png,image/webp,image/gif'
     input.onchange = () => {
       const file = input.files?.[0]
-      if (file) uploadDoc(request.id, docId, file.name)
+      if (file) void uploadDoc(request.id, docId, file).then(error => {
+        if (error) window.alert(error)
+      }).catch(error => {
+        console.error('Failed to save clearance attachment', error)
+        window.alert('Could not upload the file. Please check your connection and try again.')
+      })
     }
     input.click()
+  }
+  const handleSubmitRequest = async () => {
+    setSubmitting(true)
+    setSubmitError('')
+    const error = await submitRequest(request.id)
+    setSubmitting(false)
+    if (error) setSubmitError(error)
+    else setActiveTab('pipeline')
   }
 
   return (
@@ -50,15 +67,17 @@ export default function Clearance() {
           <div className="clearance__badge-group" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span className="clearance__badge">{request.id}</span>
             <span className={`clearance__badge ${request.status === 'in_progress' ? 'clearance__badge--progress' : ''} ${request.status === 'completed' ? 'clearance__badge--done' : ''} ${request.status === 'rejected' ? 'clearance__badge--rejected' : ''}`}>
-              {request.status === 'in_progress' ? 'In Progress' : request.status === 'completed' ? 'Completed 🎉' : 'Rejected'}
+              {request.status === 'draft' ? 'Documents needed' : request.status === 'in_progress' ? 'In Progress' : request.status === 'completed' ? 'Completed 🎉' : 'Needs attention'}
             </span>
-            <button
-              className="clearance__btn"
-              onClick={() => setShowCert(true)}
-              style={{ background: request.status === 'completed' ? '#10b981' : '#2563eb', color: '#fff', padding: '6px 14px', borderRadius: '20px', fontWeight: '700', fontSize: '0.85rem' }}
-            >
-              📜 {request.status === 'completed' ? 'View Official Certificate' : 'Certificate Preview'}
-            </button>
+            {request.status === 'completed' && (
+              <button
+                className="clearance__btn"
+                onClick={() => setShowCert(true)}
+                style={{ background: '#10b981', color: '#fff', padding: '6px 14px', borderRadius: '20px', fontWeight: '700', fontSize: '0.85rem' }}
+              >
+                View completed request summary
+              </button>
+            )}
           </div>
         </div>
 
@@ -70,7 +89,7 @@ export default function Clearance() {
             Documents ({request.docs.filter(d => d.verified).length}/{request.docs.length})
           </button>
           <button className={`clearance__tab ${activeTab === 'chat' ? 'clearance__tab--active' : ''}`} onClick={() => setActiveTab('chat')}>
-            AI Assistant
+            Help & guidance
           </button>
         </div>
 
@@ -109,7 +128,7 @@ export default function Clearance() {
                       )}
                       {step?.signature && (
                         <div className="clearance__level-sig">
-                          ✍️ Signed: <span className="clearance__sig-text">{step.signature}</span>
+                          Recorded e-signature (preview): <span className="clearance__sig-text">{step.signature}</span>
                         </div>
                       )}
                       {step?.date && <div className="clearance__level-date">{step.date}</div>}
@@ -123,7 +142,7 @@ export default function Clearance() {
                               📅 Book Meeting / Office Hours
                             </button>
                             <button className="clearance__btn" style={{ background: '#334155', color: '#fff' }} onClick={() => setActiveTab('chat')}>
-                              Ask AI Assistant →
+                              Get portal guidance →
                             </button>
                           </div>
                         </div>
@@ -140,7 +159,7 @@ export default function Clearance() {
           <div className="clearance__docs">
             <div className="clearance__docs-header">
               <h2>Required Documents</h2>
-              <p>Upload documents for leader verification or click any card to inspect preview</p>
+              <p>Upload each item to your secure portal account. You can sign in again later to continue.</p>
             </div>
             <div className="clearance__docs-grid">
               {request.docs.map(doc => (
@@ -153,27 +172,40 @@ export default function Clearance() {
                   </div>
                   <div className="clearance__doc-actions" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
                     <span className={`clearance__doc-status ${doc.verified ? 'clearance__doc-status--ok' : doc.uploaded ? 'clearance__doc-status--pending' : 'clearance__doc-status--missing'}`}>
-                      {doc.verified ? 'Verified' : doc.uploaded ? 'Pending Review' : 'Not Uploaded'}
+                      {doc.verified ? 'Reviewed' : doc.reviewStatus === 'correction_requested' ? 'Correction requested' : doc.uploaded ? 'Uploaded to portal' : 'Not selected'}
                     </span>
                     <button
                       className="clearance__doc-upload"
                       style={{ background: '#0284c7', color: '#fff' }}
+                      disabled={!doc.uploaded}
+                      title={!doc.uploaded ? 'Select the required file before previewing it.' : 'Open the selected file'}
                       onClick={() => setPreviewDoc(doc)}
                     >
-                      👁️ Preview
+                      👁️ {doc.uploaded ? 'Preview selected file' : 'Select file first'}
                     </button>
                     {!doc.verified && (
                       <button className="clearance__doc-upload" onClick={() => handleUpload(doc.id)}>
-                        {doc.uploaded ? 'Re-upload' : 'Upload'}
+                        {doc.uploaded ? 'Select again' : 'Select file'}
                       </button>
                     )}
                   </div>
                 </div>
               ))}
             </div>
+            {request.status === 'draft' && (
+              <div className="clearance__submit-panel">
+                <div>
+                  <strong>{missingDocuments ? `${missingDocuments} document${missingDocuments === 1 ? '' : 's'} remaining` : 'Your checklist is complete'}</strong>
+                  <p>{missingDocuments ? 'Add each required document before sending your request for review.' : 'Your documents are saved to your portal account and ready to submit.'}</p>
+                </div>
+                <button className="clearance__btn" disabled={missingDocuments > 0 || submitting} onClick={() => void handleSubmitRequest()}>
+                  {submitting ? 'Submitting…' : 'Submit clearance request'}
+                </button>
+                {submitError && <p className="clearance__submit-error" role="alert">{submitError}</p>}
+              </div>
+            )}
             <div className="clearance__docs-note">
-              <strong>Note:</strong> All documents must be verified by the current leader before moving to the next level.
-              Upload clear, legible copies. You'll be notified when a leader verifies your document.
+              <strong>Preview notice:</strong> Files are saved to your portal account for this preview and are not sent to University systems. Only PDF or common image files up to 10 MB are accepted.
             </div>
           </div>
         )}
@@ -197,6 +229,7 @@ export default function Clearance() {
           doc={previewDoc}
           studentName={user.profile.name}
           studentId={user.profile.id}
+          loadFile={() => getDocumentPreviewUrl(user.profile.email, request.id, previewDoc.id)}
           onClose={() => setPreviewDoc(null)}
         />
       )}
